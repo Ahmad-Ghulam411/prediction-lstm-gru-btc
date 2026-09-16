@@ -1,0 +1,10 @@
+Metrik,LSTM,GRU,Model Lebih Baik
+Konfigurasi terbaik,"40 neuron, 500 epoch","30 neuron, 500 epoch",—
+RMSE (USD),"2,045.51","2,009.65",GRU
+MAE (USD),"1,525.74","1,468.24",GRU
+MAPE (%),2.1061,2.0476,GRU
+Kategori MAPE,Sangat baik (<10%),Sangat baik (<10%),—
+Akurasi Arah (%),49.1150,51.3274,GRU
+Jumlah parameter,"8,201","3,811",GRU
+Waktu latih total (detik),79.56,83.05,LSTM
+Waktu latih per epoch (detik),0.1591,0.1661,LSTM

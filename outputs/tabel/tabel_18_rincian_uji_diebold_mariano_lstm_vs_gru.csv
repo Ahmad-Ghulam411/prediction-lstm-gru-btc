@@ -1,0 +1,14 @@
+Besaran,Nilai
+Pasangan yang diuji,LSTM vs GRU
+Fungsi loss,Kuadrat (squared error)
+Horizon peramalan (h),1 (satu hari ke depan)
+Jumlah pengamatan (T),226
+Rata-rata selisih loss (d_bar),"145,403.12"
+Autokovarians gamma_0,"10,284,640,515,989.55"
+Varians d_bar,"45,507,258,920.31"
+Statistik DM (tanpa koreksi),0.681606
+Faktor koreksi HLN,0.99778516
+Statistik DM* (dengan koreksi HLN),0.680096
+Derajat bebas,225
+"Nilai kritis t (alpha = 5%, dua sisi)",+/- 1.970563
+p-value,0.49714264

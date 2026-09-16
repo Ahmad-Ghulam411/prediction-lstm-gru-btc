@@ -1,0 +1,9 @@
+Komponen,Isi
+Hipotesis nol (H0),E[d_t] = 0 — akurasi LSTM dan GRU SAMA
+Hipotesis alternatif (H1),E[d_t] != 0 — akurasi LSTM dan GRU BERBEDA
+Taraf signifikansi,"alpha = 5% (0.05), uji dua sisi"
+Kaidah keputusan,Tolak H0 jika p-value < 0.05 atau |DM*| > 1.9706
+Statistik uji DM*,0.680096
+p-value,0.49714264
+Keputusan,GAGAL TOLAK H0 (terima H0)
+Kesimpulan,Perbedaan akurasi LSTM dan GRU TIDAK SIGNIFIKAN pada alpha = 5%; kedua model dapat dianggap memiliki akurasi setara.
