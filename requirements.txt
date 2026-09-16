@@ -1,0 +1,37 @@
+# ---------------------------------------------------------------------------
+# Kebutuhan pustaka Python untuk skripsi
+# "Perbandingan Metode LSTM dan GRU dalam Memprediksi Harga Bitcoin
+#  Berdasarkan Informasi Blockchain"
+#
+# Pemasangan:
+#     pip install -r requirements.txt
+#
+# Versi di bawah ini adalah versi yang benar-benar dipakai saat notebook
+# dieksekusi, sehingga hasil penelitian dapat direproduksi persis.
+# Python yang dipakai: 3.11
+# ---------------------------------------------------------------------------
+
+# Komputasi numerik dan pengolahan data
+numpy==2.4.6
+pandas==3.0.5
+scipy==1.17.1
+
+# Pembelajaran mesin
+scikit-learn==1.9.1
+tensorflow-cpu==2.21.0     # ganti menjadi 'tensorflow' bila memakai GPU
+keras==3.15.1
+
+# Visualisasi
+matplotlib==3.11.2
+seaborn==0.13.2
+
+# Notebook dan ekspor tabel
+jupyter==1.1.1
+jupyterlab==4.6.3
+nbconvert==7.17.1
+nbformat==5.11.1
+ipykernel==7.3.0
+openpyxl==3.1.5            # penulisan berkas .xlsx
+
+# Pengambilan data dari Blockchain.com Charts API
+requests==2.33.1
