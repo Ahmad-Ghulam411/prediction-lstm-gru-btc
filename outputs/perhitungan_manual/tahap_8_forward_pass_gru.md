@@ -1,4 +1,4 @@
-# Perhitungan Manual - Tahap 8_forward_pass_gru: Forward Pass GRU (Jendela Pertama Data Uji)
+# Perhitungan Manual - Tahap 8: Forward Pass GRU (Jendela Pertama Data Uji)
 
 ## Rumus yang diverifikasi (konvensi Keras, `reset_after=True`)
 

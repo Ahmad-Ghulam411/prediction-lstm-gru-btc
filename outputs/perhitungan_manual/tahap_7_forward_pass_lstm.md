@@ -1,4 +1,4 @@
-# Perhitungan Manual - Tahap 7_forward_pass_lstm: Forward Pass LSTM (Jendela Pertama Data Uji)
+# Perhitungan Manual - Tahap 7: Forward Pass LSTM (Jendela Pertama Data Uji)
 
 ## Rumus yang diverifikasi
 

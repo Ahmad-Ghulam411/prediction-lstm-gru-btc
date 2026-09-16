@@ -147,8 +147,10 @@ def tulis_manual(tahap, judul: str, isi: str) -> str:
     ``outputs/perhitungan_manual/tahap_X.md`` (siap disalin ke Bab III).
     """
     path = os.path.join(DIR_MANUAL, f"tahap_{tahap}.md")
+    # "8_forward_pass_gru" -> ditampilkan sebagai "Tahap 8" pada judul berkas
+    nomor_tampil = str(tahap).split("_")[0]
     with open(path, "w", encoding="utf-8") as f:
-        f.write(f"# Perhitungan Manual - Tahap {tahap}: {judul}\n\n")
+        f.write(f"# Perhitungan Manual - Tahap {nomor_tampil}: {judul}\n\n")
         f.write(textwrap.dedent(isi).strip() + "\n")
     print(f"  [tersimpan] Perhitungan manual Tahap {tahap} -> "
           f"{os.path.relpath(path, DIR_PROYEK)}")
