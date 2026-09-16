@@ -1,0 +1,11 @@
+Kode,Variabel,Nama Kolom,Satuan,Definisi Operasional,Sumber
+Y / X1,Close Price (USD),close_price,USD,Harga penutupan harian Bitcoin rata-rata pasar bursa utama dalam dolar AS; menjadi variabel target (Y) sekaligus fitur (X1).,Blockchain.com Charts API - chart 'market-price'
+X2,Miners Revenue (USD),miners_revenue,USD,"Total pendapatan penambang per hari, yaitu nilai hadiah blok (block reward) ditambah biaya transaksi, dinilai dalam USD.",Blockchain.com Charts API - chart 'miners-revenue'
+X3,Difficulty,difficulty,tanpa satuan,"Ukuran relatif tingkat kesulitan menemukan blok baru. Nilai disesuaikan jaringan setiap 2.016 blok (sekitar dua minggu), sehingga bersifat fungsi tangga (step function) pada data harian.",Blockchain.com Charts API - chart 'difficulty'
+X4,Hash Rate,hash_rate,TH/s,Estimasi jumlah tera-hash per detik yang dikerjakan jaringan penambang Bitcoin; mencerminkan kapasitas komputasi jaringan.,Blockchain.com Charts API - chart 'hash-rate'
+X5,Median Confirmation Time,median_confirmation_time,menit,Waktu median yang dibutuhkan sebuah transaksi (dengan biaya) untuk masuk ke blok yang telah ditambang.,Blockchain.com Charts API - chart 'median-confirmation-time'
+X6,Average Block Size,avg_block_size,MB,Ukuran rata-rata blok yang ditambang per hari dalam megabyte.,Blockchain.com Charts API - chart 'avg-block-size'
+X7,Total Unique Addresses,n_unique_addresses,alamat,Jumlah alamat Bitcoin unik yang digunakan pada hari tersebut; menjadi proksi tingkat aktivitas pengguna jaringan.,Blockchain.com Charts API - chart 'n-unique-addresses'
+X8,Transaction per Block,n_transactions_per_block,transaksi/blok,Jumlah rata-rata transaksi yang tercatat dalam satu blok.,Blockchain.com Charts API - chart 'n-transactions-per-block'
+X9,Confirmed Transaction,n_transactions,transaksi,Jumlah transaksi terkonfirmasi yang tercatat di blockchain Bitcoin per hari.,Blockchain.com Charts API - chart 'n-transactions'
+X10,Cost % per Transaction,cost_per_transaction_percent,%,Rasio total pendapatan penambang terhadap total nilai transaksi (biaya jaringan sebagai persentase volume transaksi).,Blockchain.com Charts API - chart 'cost-per-transaction-percent'
