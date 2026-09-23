@@ -1,0 +1,19 @@
+# Lingkungan virtual Python
+.venv/
+venv/
+env/
+
+# Cache Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Berkas sementara Jupyter
+.ipynb_checkpoints/
+
+# Berkas sementara sistem
+.DS_Store
+Thumbs.db
+
+# Skrip uji cepat yang dibuat otomatis oleh tools/uji_cepat.py
+tools/_skrip_uji_cepat.py

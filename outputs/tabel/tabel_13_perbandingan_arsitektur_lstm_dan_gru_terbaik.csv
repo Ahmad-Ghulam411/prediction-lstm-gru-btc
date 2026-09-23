@@ -1,0 +1,11 @@
+Aspek,LSTM,GRU
+Konfigurasi terbaik (neuron x epoch),40 x 500,30 x 500
+Jumlah gerbang,"3 (forget, input, output)","2 (update, reset)"
+Jumlah himpunan bobot,"4 (i, f, c, o)","3 (z, r, h)"
+Memori internal,h_t dan c_t,hanya h_t
+Jumlah parameter lapisan rekuren,"8,160","3,780"
+Jumlah parameter total,"8,201","3,811"
+Waktu latih total (detik),79.56,83.05
+Waktu latih per epoch (detik),0.1591,0.1661
+RMSE data validasi (USD),"2,503.99","2,564.89"
+MAPE data validasi (%),1.9025,1.9797
