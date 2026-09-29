@@ -5,10 +5,7 @@ Sumber data: Blockchain.com Charts API
     https://api.blockchain.info/charts/<nama-chart>?timespan=...&start=...
     &format=json&sampled=false
 
-Urutan sumber data yang dipakai (lihat ``muat_atau_unduh``):
-    1. Jika ``data/dataset_bitcoin.csv`` sudah ada -> pakai berkas tersebut.
-    2. Jika belum ada -> unduh dari API, gabungkan per tanggal (UTC),
-       lalu simpan ke ``data/dataset_bitcoin.csv``.
+Data akan tersimpan di ``data/dataset_bitcoin.csv``.
 """
 
 from __future__ import annotations
