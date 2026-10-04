@@ -2097,6 +2097,601 @@ numerik, dan model siap dibandingkan dengan GRU pada Tahap 8.
 """)
 ''')
 
+md(r'''
+### 7.F Asal-usul nilai bobot LSTM: dari inisialisasi sampai bobot akhir
+
+Bobot yang dipakai pada *forward pass* Tahap 7.E **bukan hasil satu rumus**,
+melainkan hasil akhir proses pelatihan. Bagian ini menelusurinya langkah demi
+langkah dengan angka asli, dan setiap langkah dicocokkan dengan Keras.
+
+1. **Batas acak awal (Glorot uniform).** Keras menyimpan bobot masukan keempat
+   gerbang dalam *satu* matriks kernel berukuran $n_{fitur} \times 4n_{unit}$
+   (urutan blok **i, f, c, o**), sehingga $n_{in} = n_{fitur}$ dan
+   $n_{out} = 4n_{unit}$:
+   $$a = \sqrt{\frac{6}{n_{in} + n_{out}}}, \qquad \mathbf{W} \sim U(-a,\,a)$$
+2. **Bobot awal** diambil acak di dalam batas itu dengan *seed* yang sama dengan
+   pelatihan.
+3. **Banyaknya batch per epoch** $= \lceil N_{jendela} / \text{batch size} \rceil$,
+   sehingga total pembaruan bobot $=$ batch per epoch $\times$ epoch.
+4. **Satu langkah Adam** dihitung manual untuk satu bobot:
+   $$m_t = \beta_1 m_{t-1} + (1-\beta_1)\,g_t,\qquad
+     v_t = \beta_2 v_{t-1} + (1-\beta_2)\,g_t^2$$
+   $$\alpha_t = \eta\,\frac{\sqrt{1-\beta_2^{\,t}}}{1-\beta_1^{\,t}},\qquad
+     w_t = w_{t-1} - \alpha_t\,\frac{m_t}{\sqrt{v_t} + \varepsilon}$$
+   dengan gradien $g_t = \partial L / \partial w$ yang diperiksa memakai beda
+   hingga terpusat $\big[L(w+h) - L(w-h)\big] / 2h$.
+5. **Pelatihan diulang** dengan *seed* yang sama sambil mencatat bobot neuron
+   ke-1 di akhir epoch tertentu.
+6. **Bobot akhir** dibuktikan identik dengan bobot model terbaik Tahap 7.1.
+
+Fungsi `telusuri_asal_bobot()` di bawah dipakai **sama persis** oleh GRU pada
+Tahap 8.G. Hasilnya disimpan ke
+`outputs/perhitungan_manual/tahap_7_asal_usul_bobot_lstm.md`.
+''')
+
+kode(r'''
+utils.cetak_sub("7.9 PERHITUNGAN MANUAL — asal-usul bobot LSTM (inisialisasi sampai bobot akhir)")
+
+# Urutan blok gerbang di dalam matriks gabungan Keras untuk tiap arsitektur
+GERBANG_KERAS = {
+    "LSTM": [("i", "input gate"), ("f", "forget gate"),
+             ("c", "kandidat cell"), ("o", "output gate")],
+    "GRU": [("z", "update gate"), ("r", "reset gate"),
+            ("h", "kandidat hidden state")],
+}
+
+
+def forward_numpy_batch(tipe, W, U, b, Wy, by, X):
+    """
+    Forward pass satu batch dalam float64 memakai rumus Keras yang sama dengan
+    Tahap 7.E (LSTM) dan 8.F (GRU). Mengembalikan vektor prediksi y_hat.
+    """
+    sig = lambda z: 1.0 / (1.0 + np.exp(-z))
+    X = np.asarray(X, dtype=np.float64)
+    h = np.zeros((X.shape[0], U.shape[0]))
+    c = np.zeros_like(h)
+    for t in range(X.shape[1]):
+        x_t = X[:, t, :]
+        if tipe == "LSTM":
+            z_i, z_f, z_c, z_o = np.split(x_t @ W + h @ U + b, 4, axis=1)
+            c = sig(z_f) * c + sig(z_i) * np.tanh(z_c)
+            h = sig(z_o) * np.tanh(c)
+        else:
+            x_z, x_r, x_h = np.split(x_t @ W + b[0], 3, axis=1)
+            h_z, h_r, h_h = np.split(h @ U + b[1], 3, axis=1)
+            z = sig(x_z + h_z)
+            r = sig(x_r + h_r)
+            h = z * h + (1.0 - z) * np.tanh(x_h + r * h_h)
+    return (h @ Wy + by).ravel()
+
+
+def tabel_markdown(kepala, isi):
+    """Susun daftar baris menjadi tabel markdown (siap disalin ke Bab III)."""
+    hasil = ["| " + " | ".join(kepala) + " |", "|" + "|".join("---" for _ in kepala) + "|"]
+    hasil += ["| " + " | ".join(str(sel) for sel in baris) + " |" for baris in isi]
+    return hasil
+
+
+def telusuri_asal_bobot(tipe, model_terbaik, jumlah_neuron, jumlah_epoch):
+    """
+    Telusuri asal-usul bobot model terbaik langkah demi langkah:
+
+    1. batas Glorot uniform dari n_in dan n_out kernel gabungan Keras,
+    2. bobot awal neuron ke-1 (seed sama dengan pelatihan),
+    3. banyaknya batch per epoch dan total pembaruan bobot,
+    4. satu langkah Adam yang dihitung manual lalu dicocokkan dengan Keras,
+    5. pelatihan ulang sambil mencatat jejak bobot neuron ke-1,
+    6. pembuktian bahwa bobot akhir identik dengan bobot model terbaik.
+
+    Seluruh teks dicetak sekaligus dikumpulkan, lalu dikembalikan sebagai isi
+    markdown untuk ``outputs/perhitungan_manual/``.
+    """
+    baris_md = []
+
+    def catat(teks: str = "") -> None:
+        print(teks)
+        baris_md.append(teks)
+
+    def catat_banyak(daftar) -> None:
+        for teks in daftar:
+            catat(teks)
+
+    seed = CONFIG["SEED"]
+    u = jumlah_neuron
+    gerbang = GERBANG_KERAS[tipe]
+    k = len(gerbang)
+    lambang = [g for g, _ in gerbang]
+    daftar_lambang = ", ".join(lambang)
+    kolom_n1 = [g * u for g in range(k)]            # indeks kolom neuron ke-1 tiap blok
+    nomor_kolom = ", ".join(f"ke-{c + 1}" for c in kolom_n1)
+    label_fitur = [f"X{j + 1} {v['nama']}" for j, v in enumerate(modul_data.DEFINISI_VARIABEL)]
+    is_lstm = tipe == "LSTM"
+    nomor_tahap = 7 if is_lstm else 8
+
+    def tabel_bobot_neuron1(W, b):
+        kepala = ["Variabel"] + [f"W_{g}[:,1]" for g in lambang]
+        isi = [[label_fitur[j]] + [f"{W[j, c]:.6f}" for c in kolom_n1] for j in range(W.shape[0])]
+        if is_lstm:
+            isi.append(["Bias b[1]"] + [f"{b[c]:.6f}" for c in kolom_n1])
+        else:
+            isi.append(["Bias b_in[1]"] + [f"{b[0, c]:.6f}" for c in kolom_n1])
+            isi.append(["Bias b_rec[1]"] + [f"{b[1, c]:.6f}" for c in kolom_n1])
+        return tabel_markdown(kepala, isi)
+
+    # ------------------------------------------------------------------ #
+    # LANGKAH 1 — n_in, n_out, dan batas Glorot uniform
+    # ------------------------------------------------------------------ #
+    model_awal = bangun_model(tipe, u, seed)
+    lapisan_awal = model_awal.get_layer("lapisan_rekuren")
+    W0, U0, b0 = [w.astype(np.float64) for w in lapisan_awal.get_weights()]
+    Wy0, by0 = [w.astype(np.float64) for w in model_awal.get_layer("lapisan_keluaran").get_weights()]
+    n_fitur_w, n_kolom = W0.shape
+    n_in, n_out = n_fitur_w, n_kolom
+    batas = float(np.sqrt(6.0 / (n_in + n_out)))
+    batas_salah = float(np.sqrt(6.0 / (n_in + u)))
+    maks_awal = float(np.abs(W0).max())
+
+    assert type(lapisan_awal.cell.kernel_initializer).__name__ == "GlorotUniform"
+    assert n_out == k * u, "Kernel gabungan seharusnya berukuran n_fitur x (jumlah blok x n_unit)"
+    assert maks_awal <= batas, "Ada bobot awal di luar batas Glorot"
+
+    ukuran_batch = CONFIG["BATCH_SIZE"]
+    n_jendela = len(X_latih)
+    batch_per_epoch = int(np.ceil(n_jendela / ukuran_batch))
+    batch_penuh, sisa = divmod(n_jendela, ukuran_batch)
+    total_pembaruan = batch_per_epoch * jumlah_epoch
+    assert n_jendela == n_latih - LOOKBACK
+
+    catat("## Gambaran besar")
+    catat()
+    catat(f"Bobot pada tabel bobot neuron ke-1 yang dipakai untuk *forward pass* "
+          f"**tidak dihitung dengan satu rumus**. Bobot itu adalah hasil akhir dari "
+          f"proses berikut:")
+    catat()
+    catat_banyak(tabel_markdown(
+        ["Langkah", "Apa yang terjadi", "Hasil"],
+        [["1", "Menentukan n_in, n_out, dan batas acak Glorot uniform", f"a = {batas:.6f}"],
+         ["2", f"Mengambil bilangan acak di dalam batas itu (seed {seed})", "bobot awal"],
+         ["3", "Menghitung banyaknya batch per epoch",
+          f"{batch_per_epoch} batch/epoch, {utils.fmt_int(total_pembaruan)} pembaruan"],
+         ["4", "Memperbarui bobot satu kali dengan Adam (contoh satu bobot)", "bobot bergeser sedikit"],
+         ["5", f"Mengulang pembaruan sebanyak {utils.fmt_int(total_pembaruan)} kali", "bobot akhir"],
+         ["6", "Membaca bobot akhir neuron ke-1", "tabel bobot pada Bab III"]]))
+    catat()
+    catat("Ibaratnya, setiap bobot adalah kenop pengatur. Kenop mula-mula diputar ke "
+          "posisi acak yang kecil, lalu digeser sedikit demi sedikit ke arah yang "
+          "membuat galat prediksi makin kecil.")
+    catat()
+
+    catat("## Langkah 1 — Menentukan n_in, n_out, dan batas Glorot uniform")
+    catat()
+    catat("**Apa yang dilakukan?** Sebelum pelatihan, setiap bobot masukan diisi "
+          "bilangan acak kecil. Agar tidak terlalu besar atau terlalu kecil, Keras "
+          "memakai aturan Glorot uniform: bobot diambil acak secara merata di antara "
+          "−a dan +a.")
+    catat()
+    catat(f"**Dari mana n_in dan n_out?** Keras tidak membuat matriks terpisah untuk "
+          f"tiap gerbang. Bobot masukan {k} blok ({daftar_lambang}) disimpan "
+          f"berdampingan dalam SATU matriks kernel, dan batas Glorot dihitung satu "
+          f"kali untuk matriks gabungan itu. Jadi n_in = jumlah baris kernel dan "
+          f"n_out = jumlah kolom kernel.")
+    catat()
+    catat_banyak(tabel_markdown(
+        ["Besaran", "Cara menentukan", "Nilai"],
+        [["n_fitur", "banyaknya variabel masukan (X1–X10)", n_fitur_w],
+         ["n_unit", "banyaknya neuron model terbaik", u],
+         ["Bentuk kernel W", f"(n_fitur, {k} × n_unit), urutan blok {daftar_lambang}", str(W0.shape)],
+         ["n_in", "jumlah baris kernel = n_fitur", n_in],
+         ["n_out", f"jumlah kolom kernel = {k} × n_unit = {k} × {u}", n_out]]))
+    catat()
+    catat("```")
+    catat("a = √( 6 / (n_in + n_out) )")
+    catat(f"  = √( 6 / ({n_in} + {n_out}) )")
+    catat(f"  = √( 6 / {n_in + n_out} )")
+    catat(f"  = √( {6.0 / (n_in + n_out):.6f} )")
+    catat(f"  = {batas:.6f}")
+    catat()
+    catat(f"Jadi setiap bobot masukan awal "
+          f"{', '.join(f'W_{g}' for g in lambang)} ~ U(−{batas:.6f}, +{batas:.6f})")
+    catat("```")
+    catat()
+    catat("**Dari mana angka 6?** Glorot menginginkan varians bobot "
+          "2 / (n_in + n_out). Distribusi seragam U(−a, a) memiliki varians a²/3. "
+          "Dengan menyamakan keduanya, a²/3 = 2 / (n_in + n_out), sehingga "
+          "a = √(6 / (n_in + n_out)).")
+    catat()
+    catat("**Tiga hal yang sering keliru:**")
+    catat()
+    catat(f"1. Menghitung per gerbang dengan matriks ({n_in}, {u}) menghasilkan "
+          f"√(6 / {n_in + u}) = {batas_salah:.6f}. Angka ini *bukan* yang dipakai Keras.")
+    if not is_lstm:
+        catat(f"   Walaupun pembahasan sering hanya menyebut gerbang update dan reset, "
+              f"blok kandidat h ikut berada di matriks yang sama, sehingga "
+              f"n_out = 3 × n_unit, bukan 2 × n_unit.")
+    catat(f"2. LOOKBACK = {LOOKBACK} tidak mengubah n_in. Bobot yang sama dipakai ulang "
+          f"pada setiap hari t = 1, …, {LOOKBACK}, sehingga pada satu langkah waktu "
+          f"yang masuk hanya {n_fitur_w} fitur.")
+    if is_lstm:
+        catat("3. Bobot rekuren U tidak memakai Glorot, melainkan inisialisasi "
+              "Orthogonal. Bias diisi 0, kecuali bias forget gate yang diisi 1 "
+              "(unit_forget_bias=True).")
+    else:
+        catat("3. Bobot rekuren U tidak memakai Glorot, melainkan inisialisasi "
+              "Orthogonal. Kedua baris bias (b_in dan b_rec) diisi 0.")
+    catat()
+    catat(f"**Pemeriksaan:** nilai mutlak terbesar pada kernel awal = {maks_awal:.6f} "
+          f"≤ {batas:.6f} → OK.")
+    catat()
+
+    # ------------------------------------------------------------------ #
+    # LANGKAH 2 — bobot awal neuron ke-1
+    # ------------------------------------------------------------------ #
+    var_teori = 2.0 / (n_in + n_out)
+    var_empiris = float(W0.var())
+    catat(f"## Langkah 2 — Membangkitkan bobot awal (seed {seed})")
+    catat()
+    catat(f"**Apa yang dilakukan?** Komputer mengambil {utils.fmt_int(W0.size)} "
+          f"bilangan acak dari U(−{batas:.6f}, +{batas:.6f}) untuk mengisi kernel "
+          f"{W0.shape}. Seed {seed} dikunci lebih dahulu, sehingga bilangan acak yang "
+          f"keluar selalu sama setiap kali notebook dijalankan.")
+    catat()
+    catat(f"**Mana yang milik neuron ke-1?** Neuron ke-1 adalah kolom pertama dari "
+          f"setiap blok gerbang, yaitu kolom {nomor_kolom} pada kernel gabungan "
+          f"(urutan {daftar_lambang}).")
+    catat()
+    catat(f"**Tabel bobot awal neuron ke-1 {tipe} (sebelum pelatihan)**")
+    catat()
+    catat_banyak(tabel_bobot_neuron1(W0, b0))
+    catat()
+    catat(f"**Pemeriksaan:** seluruh {utils.fmt_int(W0.size)} bobot awal berada di "
+          f"dalam ±{batas:.6f}. Varians empirisnya {var_empiris:.6f}, dekat dengan "
+          f"varians teori 2 / (n_in + n_out) = {var_teori:.6f} → OK.")
+    catat()
+
+    # ------------------------------------------------------------------ #
+    # LANGKAH 3 — banyaknya batch dan pembaruan bobot
+    # ------------------------------------------------------------------ #
+    catat("## Langkah 3 — Menghitung banyaknya batch dan pembaruan bobot")
+    catat()
+    catat(f"**Apa yang dilakukan?** Bobot tidak diperbarui setelah melihat seluruh "
+          f"data sekaligus, tetapi setiap selesai memproses satu kelompok kecil "
+          f"(*batch*) berisi {ukuran_batch} jendela. Satu *epoch* berarti seluruh "
+          f"{n_jendela} jendela latih sudah dipakai tepat satu kali.")
+    catat()
+    catat_banyak(tabel_markdown(
+        ["No", "Besaran", "Perhitungan", "Hasil"],
+        [["1", "Jumlah hari seluruh data", "—", utils.fmt_int(n_total)],
+         ["2", "Hari latih + validasi",
+          f"floor({CONFIG['RASIO_LATIH']} × {utils.fmt_int(n_total)}) = "
+          f"floor({CONFIG['RASIO_LATIH'] * n_total:,.1f})", utils.fmt_int(n_latih_penuh)],
+         ["3", "Hari validasi",
+          f"floor({CONFIG['RASIO_VALIDASI_DARI_LATIH']} × {n_latih_penuh}) = "
+          f"floor({CONFIG['RASIO_VALIDASI_DARI_LATIH'] * n_latih_penuh:,.1f})", utils.fmt_int(n_val)],
+         ["4", "Hari latih", f"{n_latih_penuh} − {n_val}", utils.fmt_int(n_latih)],
+         ["5", "Jendela latih", f"hari latih − LOOKBACK = {n_latih} − {LOOKBACK}", utils.fmt_int(n_jendela)],
+         ["6", "Batch size", "ditetapkan peneliti pada CONFIG (tidak dihitung)", ukuran_batch],
+         ["7", "Batch per epoch",
+          f"⌈{n_jendela} / {ukuran_batch}⌉ = ⌈{n_jendela / ukuran_batch:.3f}⌉", batch_per_epoch],
+         ["8", "Epoch", "konfigurasi terbaik hasil tuning", utils.fmt_int(jumlah_epoch)],
+         ["9", "Total pembaruan bobot", f"{batch_per_epoch} × {jumlah_epoch}", utils.fmt_int(total_pembaruan)]]))
+    catat()
+    catat(f"**Mengapa {n_latih} − {LOOKBACK}?** Setiap jendela membutuhkan {LOOKBACK} "
+          f"hari sebelumnya sebagai masukan. Tujuh hari pertama data latih tidak "
+          f"memiliki {LOOKBACK} hari sebelumnya, sehingga hanya berperan sebagai "
+          f"masukan dan tidak pernah menjadi target. Target pertama adalah "
+          f"{pd.Timestamp(tanggal_latih[0]).date()} dan target terakhir "
+          f"{pd.Timestamp(tanggal_latih[-1]).date()}.")
+    catat()
+    if sisa:
+        catat(f"**Mengapa dibulatkan ke atas?** {n_jendela} = {batch_penuh} × "
+              f"{ukuran_batch} + {sisa}. Keras tidak membuang {sisa} jendela sisa, "
+              f"melainkan menjadikannya batch ke-{batch_per_epoch} yang berisi "
+              f"{sisa} jendela.")
+        catat()
+    catat(f"**Mengapa batch size {ukuran_batch}?** Batch size adalah hyperparameter "
+          f"yang ditetapkan peneliti, bukan hasil perhitungan. Nilainya dibuat sama "
+          f"untuk LSTM dan GRU agar perbandingan adil, tidak ikut di-tuning, dan "
+          f"kebetulan juga merupakan nilai baku Keras.")
+    catat()
+    catat("**Pembagian batch dalam satu epoch** (urutan kronologis karena shuffle=False):")
+    catat()
+    isi_batch = []
+    for nomor_batch in range(batch_per_epoch):
+        awal = nomor_batch * ukuran_batch
+        akhir = min(awal + ukuran_batch, n_jendela)
+        isi_batch.append([nomor_batch + 1, f"{awal + 1} – {akhir}", akhir - awal,
+                          f"{pd.Timestamp(tanggal_latih[awal]).date()} s.d. "
+                          f"{pd.Timestamp(tanggal_latih[akhir - 1]).date()}"])
+    catat_banyak(tabel_markdown(["Batch", "Jendela ke-", "Banyak jendela", "Tanggal target"], isi_batch))
+    catat()
+
+    # ------------------------------------------------------------------ #
+    # LANGKAH 4 — satu langkah Adam untuk satu bobot
+    # ------------------------------------------------------------------ #
+    g1, nama_g1 = gerbang[0]
+    nama_w = f"W_{g1}[1,1]"
+    w0 = float(W0[0, 0])
+    X_b1 = X_latih[:ukuran_batch]
+    y_b1 = np.asarray(y_latih[:ukuran_batch], dtype=np.float64).ravel()
+    n_b1 = len(y_b1)
+
+    # 4a. Prediksi dan loss batch pertama (NumPy float64 dan Keras)
+    y_hat_b1 = forward_numpy_batch(tipe, W0, U0, b0, Wy0, by0, X_b1)
+    kuadrat_b1 = (y_b1 - y_hat_b1) ** 2
+    loss_manual_b1 = float(kuadrat_b1.mean())
+
+    x_tf = tf.constant(X_b1, dtype=tf.float32)
+    y_tf = tf.constant(y_b1.reshape(-1, 1), dtype=tf.float32)
+    with tf.GradientTape() as pita:
+        loss_keras_b1 = tf.reduce_mean(tf.square(y_tf - model_awal(x_tf, training=True)))
+    gradien_kernel = pita.gradient(loss_keras_b1, lapisan_awal.cell.kernel).numpy()
+    loss_keras_b1 = float(loss_keras_b1)
+    g_keras = float(gradien_kernel[0, 0])
+
+    # 4b. Pemeriksaan gradien dengan beda hingga terpusat (tanpa kalkulus)
+    langkah_h = 1e-4
+    W_plus, W_minus = W0.copy(), W0.copy()
+    W_plus[0, 0] += langkah_h
+    W_minus[0, 0] -= langkah_h
+    loss_plus = float(np.mean((y_b1 - forward_numpy_batch(tipe, W_plus, U0, b0, Wy0, by0, X_b1)) ** 2))
+    loss_minus = float(np.mean((y_b1 - forward_numpy_batch(tipe, W_minus, U0, b0, Wy0, by0, X_b1)) ** 2))
+    g_beda_hingga = (loss_plus - loss_minus) / (2 * langkah_h)
+    selisih_relatif_g = abs(g_beda_hingga - g_keras) / abs(g_keras)
+
+    # 4c. Satu langkah Adam dihitung manual
+    adam = model_awal.optimizer
+    eta = float(np.asarray(adam.learning_rate))
+    beta_1, beta_2, epsilon = float(adam.beta_1), float(adam.beta_2), float(adam.epsilon)
+    m_1 = beta_1 * 0.0 + (1 - beta_1) * g_keras
+    v_1 = beta_2 * 0.0 + (1 - beta_2) * g_keras ** 2
+    alpha_1 = eta * np.sqrt(1 - beta_2 ** 1) / (1 - beta_1 ** 1)
+    delta_w = alpha_1 * m_1 / (np.sqrt(v_1) + epsilon)
+    w1_manual = w0 - delta_w
+
+    model_awal.train_on_batch(X_b1, y_latih[:ukuran_batch])
+    w1_keras = float(lapisan_awal.get_weights()[0][0, 0])
+    selisih_w1 = abs(w1_manual - w1_keras)
+
+    np.testing.assert_allclose(loss_manual_b1, loss_keras_b1, rtol=1e-4)
+    assert selisih_relatif_g < 1e-2, "Gradien beda hingga tidak cocok dengan gradien Keras"
+    assert selisih_w1 < 1e-6, "Satu langkah Adam manual tidak cocok dengan Keras"
+
+    catat(f"## Langkah 4 — Satu kali pembaruan bobot (contoh: {nama_w})")
+    catat()
+    catat(f"Bobot yang dicontohkan adalah {nama_w}, yaitu bobot dari X1 (Close Price) "
+          f"ke {nama_g1} neuron ke-1. Nilai awalnya {w0:.6f} (Langkah 2). Setiap "
+          f"pembaruan selalu terdiri atas tiga langkah kecil: hitung loss, hitung "
+          f"gradien, lalu geser bobot.")
+    catat()
+    catat("### 4a. Hitung prediksi dan loss batch pertama")
+    catat()
+    catat(f"Batch pertama berisi jendela 1–{n_b1}. Dengan bobot awal, model "
+          f"memprediksi Close Price (ternormalisasi) untuk {n_b1} target tersebut "
+          f"memakai *forward pass* yang sama dengan Tahap {nomor_tahap}, lalu loss "
+          f"MSE dihitung:")
+    catat()
+    catat("```")
+    catat(f"L = (1/{n_b1}) × Σ (y − ŷ)²")
+    catat("```")
+    catat()
+    isi_loss = []
+    for j in list(range(3)) + [n_b1 - 1]:
+        isi_loss.append([j + 1, pd.Timestamp(tanggal_latih[j]).date(),
+                         f"{y_b1[j]:.6f}", f"{y_hat_b1[j]:.6f}", f"{kuadrat_b1[j]:.8f}"])
+        if j == 2:
+            isi_loss.append(["⋮", "⋮", "⋮", "⋮", "⋮"])
+    isi_loss.append(["", f"**Jumlah {n_b1} suku**", "", "", f"{kuadrat_b1.sum():.8f}"])
+    isi_loss.append(["", f"**L = jumlah / {n_b1}**", "", "", f"**{loss_manual_b1:.8f}**"])
+    catat_banyak(tabel_markdown(["No", "Tanggal target", "y (aktual)", "ŷ (prediksi awal)", "(y − ŷ)²"], isi_loss))
+    catat()
+    catat(f"Loss manual (NumPy) = {loss_manual_b1:.8f}; loss Keras = "
+          f"{loss_keras_b1:.8f} → OK.")
+    catat()
+    catat("### 4b. Hitung gradien g = ∂L/∂w")
+    catat()
+    catat("Gradien menjawab pertanyaan: *kalau bobot ini dinaikkan sedikit, loss naik "
+          "atau turun, dan seberapa cepat?* Keras menghitungnya secara eksak dengan "
+          "*backpropagation through time* (BPTT), yaitu aturan rantai yang "
+          f"dirambatkan mundur dari hari ke-{LOOKBACK} ke hari ke-1.")
+    catat()
+    catat(f"Untuk memeriksanya tanpa kalkulus, bobot digeser sedikit (h = {langkah_h:g}) "
+          f"ke atas dan ke bawah, lalu loss dihitung ulang (beda hingga terpusat):")
+    catat()
+    catat("```")
+    catat(f"L(w + h) = L({w0 + langkah_h:.6f}) = {loss_plus:.12f}")
+    catat(f"L(w − h) = L({w0 - langkah_h:.6f}) = {loss_minus:.12f}")
+    catat()
+    catat("g ≈ [ L(w + h) − L(w − h) ] / (2h)")
+    catat(f"  = ({loss_plus:.12f} − {loss_minus:.12f}) / {2 * langkah_h:g}")
+    catat(f"  = {g_beda_hingga:.8e}")
+    catat()
+    catat(f"Gradien Keras (BPTT)  = {g_keras:.8e}")
+    catat(f"Selisih relatif       = {selisih_relatif_g:.1e}  (praktis sama)")
+    catat("```")
+    catat()
+    arah = "naik" if g_keras > 0 else "turun"
+    tindakan = "diturunkan" if g_keras > 0 else "dinaikkan"
+    catat(f"Gradien bernilai {'positif' if g_keras > 0 else 'negatif'}: loss {arah} "
+          f"bila w dinaikkan, sehingga w harus {tindakan} agar loss mengecil.")
+    catat()
+    catat("### 4c. Geser bobot dengan Adam")
+    catat()
+    catat(f"Parameter Adam: η = {eta:g}, β₁ = {beta_1:g}, β₂ = {beta_2:g}, "
+          f"ε = {epsilon:g}. Ini langkah pertama (t = 1), sehingga m₀ = v₀ = 0.")
+    catat()
+    catat("```")
+    catat(f"m₁ = β₁·m₀ + (1 − β₁)·g       = {beta_1:g} × 0 + {1 - beta_1:g} × {g_keras:.6e}")
+    catat(f"                             = {m_1:.6e}")
+    catat(f"v₁ = β₂·v₀ + (1 − β₂)·g²      = {beta_2:g} × 0 + {1 - beta_2:g} × ({g_keras:.6e})²")
+    catat(f"                             = {v_1:.6e}")
+    catat(f"α₁ = η·√(1 − β₂¹) / (1 − β₁¹) = {eta:g} × √{1 - beta_2:g} / {1 - beta_1:g}")
+    catat(f"                             = {alpha_1:.6e}")
+    catat(f"Δw = α₁ · m₁ / (√v₁ + ε)      = {alpha_1:.6e} × {m_1:.6e} / ({np.sqrt(v_1):.6e} + {epsilon:g})")
+    catat(f"                             = {delta_w:.6e}")
+    catat()
+    catat(f"w baru = w − Δw = {w0:.8f} − ({delta_w:.8f}) = {w1_manual:.8f}")
+    catat("```")
+    catat()
+    catat(f"Hasil Keras setelah satu langkah (train_on_batch pada batch yang sama): "
+          f"{w1_keras:.8f}. Selisihnya {selisih_w1:.1e} → OK.")
+    catat()
+    if abs(delta_w) < 0.95 * eta:
+        keterangan_eps = (f"Pada contoh ini gradiennya sangat kecil sehingga ε ikut "
+                          f"berperan dan langkahnya hanya {abs(delta_w):.6f}.")
+    else:
+        keterangan_eps = f"Pada contoh ini langkahnya {abs(delta_w):.6f}, hampir sama dengan η."
+    catat("**Catatan:** Adam membagi m dengan √v, sehingga besar langkah hampir tidak "
+          f"bergantung pada besar gradien. Untuk gradien yang cukup besar, langkah "
+          f"pertama Adam kira-kira sama dengan η = {eta:g}. {keterangan_eps}")
+    catat()
+
+    # ------------------------------------------------------------------ #
+    # LANGKAH 5 — pelatihan ulang sambil mencatat jejak bobot neuron ke-1
+    # ------------------------------------------------------------------ #
+    if is_lstm:
+        nama_bias, ambil_bias = "b_f[1]", (lambda b: b[u])
+    else:
+        nama_bias, ambil_bias = "b_z_in[1]", (lambda b: b[0, 0])
+
+    titik_epoch = sorted({e for e in (1, 2, 5, 10, 50, 100, 200, 300, 400, 500, 1000)
+                          if e <= jumlah_epoch} | {jumlah_epoch})
+    jejak_bobot = {}
+
+    class CatatBobot(tf.keras.callbacks.Callback):
+        """Catat bobot neuron ke-1 pada akhir epoch-epoch terpilih."""
+        def on_epoch_end(self, epoch, logs=None):
+            if epoch + 1 in titik_epoch:
+                W_e, _, b_e = self.model.get_layer("lapisan_rekuren").get_weights()
+                jejak_bobot[epoch + 1] = (W_e.astype(np.float64), b_e.astype(np.float64))
+
+    model_ulang = bangun_model(tipe, u, seed)
+    jejak_bobot[0] = (W0, b0)
+    riwayat_ulang = model_ulang.fit(
+        X_latih, y_latih,
+        validation_data=(X_val, y_val),
+        epochs=jumlah_epoch,
+        batch_size=ukuran_batch,
+        shuffle=False,
+        verbose=0,
+        callbacks=[CatatBobot()],
+    )
+    iterasi_keras = int(np.asarray(model_ulang.optimizer.iterations))
+    loss_latih_ulang = riwayat_ulang.history["loss"]
+    assert iterasi_keras == total_pembaruan, "Jumlah pembaruan tidak sesuai perhitungan"
+
+    catat(f"## Langkah 5 — Mengulang pembaruan sebanyak {utils.fmt_int(total_pembaruan)} kali")
+    catat()
+    catat(f"Langkah 4 diulang untuk setiap batch ({batch_per_epoch} batch) pada setiap "
+          f"epoch ({utils.fmt_int(jumlah_epoch)} epoch). Pelatihan diulang dari awal "
+          f"dengan seed {seed}, dan bobot neuron ke-1 dicatat pada akhir epoch tertentu:")
+    catat()
+    kepala_jejak = (["Epoch", "Pembaruan ke-"] + [f"W_{g}[1,1]" for g in lambang]
+                    + [nama_bias, "Loss latih (MSE)"])
+    isi_jejak = []
+    for e in [0] + titik_epoch:
+        W_e, b_e = jejak_bobot[e]
+        isi_jejak.append(
+            ["0 (awal)" if e == 0 else utils.fmt_int(e), utils.fmt_int(e * batch_per_epoch)]
+            + [f"{W_e[0, c]:.6f}" for c in kolom_n1]
+            + [f"{ambil_bias(b_e):.6f}", "—" if e == 0 else f"{loss_latih_ulang[e - 1]:.6f}"])
+    catat_banyak(tabel_markdown(kepala_jejak, isi_jejak))
+    catat()
+    catat("Loss latih adalah rata-rata loss seluruh batch pada epoch tersebut "
+          "(riwayat pelatihan Keras).")
+    catat()
+
+    W_akhir, U_akhir, b_akhir = [w.astype(np.float64)
+                                 for w in model_ulang.get_layer("lapisan_rekuren").get_weights()]
+    blok_n1 = W_akhir[:, kolom_n1]
+    j_maks, g_maks = np.unravel_index(np.abs(blok_n1).argmax(), blok_n1.shape)
+    catat("**Pengamatan:**")
+    catat()
+    nilai_maks = float(blok_n1[j_maks, g_maks])
+    catat(f"- Setiap langkah umumnya menggeser bobot tidak lebih dari sekitar η = {eta:g}, "
+          f"tetapi setelah {utils.fmt_int(total_pembaruan)} langkah total "
+          f"pergeserannya menjadi besar.")
+    arah_loss = "turun" if loss_latih_ulang[-1] < loss_latih_ulang[0] else "berubah"
+    catat(f"- Loss latih {arah_loss} dari {loss_latih_ulang[0]:.6f} (epoch 1) menjadi "
+          f"{loss_latih_ulang[-1]:.6f} (epoch {utils.fmt_int(jumlah_epoch)}).")
+    if abs(nilai_maks) > batas:
+        catat(f"- Bobot akhir boleh keluar dari batas Glorot ±{batas:.6f}. Contohnya "
+              f"W_{lambang[g_maks]}[{j_maks + 1},1] berakhir di {nilai_maks:.6f}. "
+              f"Batas Glorot hanya berlaku untuk bobot awal.")
+    else:
+        catat(f"- Batas Glorot ±{batas:.6f} hanya berlaku untuk bobot awal; setelah "
+              f"pelatihan bobot boleh keluar dari batas itu.")
+    catat()
+    catat(f"**Pemeriksaan:** penghitung iterasi optimizer Keras = "
+          f"{utils.fmt_int(iterasi_keras)} = {batch_per_epoch} × {jumlah_epoch} → OK.")
+    catat()
+
+    # ------------------------------------------------------------------ #
+    # LANGKAH 6 — bobot akhir = bobot model terbaik
+    # ------------------------------------------------------------------ #
+    bobot_terbaik = [w.astype(np.float64)
+                     for w in model_terbaik.get_layer("lapisan_rekuren").get_weights()]
+    selisih_akhir = max(float(np.abs(a - b).max())
+                        for a, b in zip([W_akhir, U_akhir, b_akhir], bobot_terbaik))
+    jumlah_param = sum(w.size for w in bobot_terbaik)
+    assert selisih_akhir < 1e-6, "Pelatihan ulang tidak menghasilkan bobot yang sama"
+
+    if is_lstm:
+        letak_bias = (f"Bias neuron ke-1 diambil dari elemen {nomor_kolom} vektor "
+                      f"bias {b_akhir.shape}.")
+    else:
+        letak_bias = (f"Bias neuron ke-1 diambil dari elemen {nomor_kolom} pada baris "
+                      f"b_in dan baris b_rec matriks bias {b_akhir.shape}.")
+    catat(f"## Langkah 6 — Bobot akhir neuron ke-1 (yang dipakai pada *forward pass*)")
+    catat()
+    catat(f"Setelah {utils.fmt_int(total_pembaruan)} pembaruan, bobot model dibaca "
+          f"dengan get_weights(). Kernel {W_akhir.shape} dipecah menjadi {k} blok "
+          f"berurutan {daftar_lambang}, lalu kolom pertama tiap blok diambil sebagai "
+          f"neuron ke-1. {letak_bias}")
+    catat()
+    catat(f"**Tabel bobot akhir neuron ke-1 {tipe} (setelah pelatihan)**")
+    catat()
+    catat_banyak(tabel_bobot_neuron1(W_akhir, b_akhir))
+    catat()
+    if not is_lstm:
+        selisih_bias_zr = float(np.abs(b_akhir[0, :2 * u] - b_akhir[1, :2 * u]).max())
+        if selisih_bias_zr < 1e-6:
+            catat("**Mengapa b_in dan b_rec gerbang z dan r bernilai sama?** Pada gerbang "
+                  "z dan r, kedua bias langsung dijumlahkan di dalam sigmoid, sehingga "
+                  "gradien keduanya selalu sama. Karena sama-sama berawal dari 0, "
+                  "keduanya bergeser bersamaan dan tetap kembar. Pada kandidat h, b_rec "
+                  "dikalikan dengan r terlebih dahulu, sehingga gradiennya berbeda dan "
+                  f"nilainya berpisah (selisih terbesar b_in − b_rec gerbang z dan r = "
+                  f"{selisih_bias_zr:.1e}).")
+            catat()
+    catat(f"**Pemeriksaan:** bobot hasil pelatihan ulang dibandingkan dengan bobot "
+          f"model terbaik dari Tahap {nomor_tahap}.1 untuk seluruh "
+          f"{utils.fmt_int(jumlah_param)} parameter lapisan rekuren. Selisih mutlak "
+          f"terbesarnya {selisih_akhir:.1e} → identik. Tabel di atas sama persis "
+          f"dengan bobot yang dipakai pada *forward pass* Tahap {nomor_tahap}.")
+    catat()
+
+    catat("## Kesimpulan")
+    catat()
+    catat(f"Bobot {tipe} neuron ke-1 berasal dari bilangan acak Glorot uniform "
+          f"U(−{batas:.6f}, +{batas:.6f}) dengan n_in = {n_in} dan "
+          f"n_out = {k} × {u} = {n_out}, yang dibangkitkan dengan seed {seed}. Bobot itu "
+          f"kemudian diperbarui oleh Adam sebanyak {batch_per_epoch} batch × "
+          f"{utils.fmt_int(jumlah_epoch)} epoch = {utils.fmt_int(total_pembaruan)} kali "
+          f"berdasarkan gradien BPTT dari loss MSE. Satu langkah Adam yang dihitung "
+          f"manual sama dengan hasil Keras, dan pelatihan ulang menghasilkan bobot "
+          f"yang identik dengan model terbaik, sehingga seluruh nilai bobot pada "
+          f"Bab III dapat ditelusuri asal-usulnya.")
+
+    print(f"\n✔ Asal-usul bobot {tipe} tertelusuri dan cocok dengan Keras")
+    return "\n".join(baris_md)
+
+
+isi_asal_bobot_lstm = telusuri_asal_bobot("LSTM", model_lstm, neuron_lstm, epoch_lstm)
+utils.tulis_manual("7_asal_usul_bobot_lstm",
+                   "Asal-Usul Bobot LSTM (Inisialisasi sampai Bobot Akhir)",
+                   isi_asal_bobot_lstm)
+''')
+
 # =========================================================================== #
 # TAHAP 8 — GRU
 # =========================================================================== #
@@ -2721,6 +3316,34 @@ Sebagai tambahan, telah dibuktikan secara numerik bahwa rumus GRU buku teks
 Cho dkk. (2014) memberi hasil berbeda pada bobot yang sama, sehingga
 perhitungan manual di Bab III harus memakai konvensi Keras.
 """)
+''')
+
+md(r'''
+### 8.G Asal-usul nilai bobot GRU: dari inisialisasi sampai bobot akhir
+
+Langkahnya sama dengan Tahap 7.F dan memakai fungsi `telusuri_asal_bobot()`
+yang sama. Perbedaannya hanya pada susunan kernel GRU: Keras menyimpan bobot
+masukan **tiga** blok (**z, r, h**) dalam satu matriks berukuran
+$n_{fitur} \times 3n_{unit}$, sehingga
+
+$$n_{in} = n_{fitur}, \qquad n_{out} = 3n_{unit}, \qquad
+a = \sqrt{\frac{6}{n_{in} + 3n_{unit}}}$$
+
+Walaupun yang sering dibahas hanya gerbang *update* (z) dan *reset* (r), blok
+kandidat $\tilde{\mathbf{h}}$ ikut berada di matriks yang sama, sehingga
+$n_{out} = 3n_{unit}$, bukan $2n_{unit}$. Seluruh bias GRU (baris $\mathbf{b}^{(in)}$
+dan $\mathbf{b}^{(rec)}$) berawal dari 0. Hasilnya disimpan ke
+`outputs/perhitungan_manual/tahap_8_asal_usul_bobot_gru.md`.
+''')
+
+kode(r'''
+utils.cetak_sub("8.9 PERHITUNGAN MANUAL — asal-usul bobot GRU (inisialisasi sampai bobot akhir)")
+print("  Memakai fungsi telusuri_asal_bobot() YANG SAMA dengan Tahap 7.9.\n")
+
+isi_asal_bobot_gru = telusuri_asal_bobot("GRU", model_gru, neuron_gru, epoch_gru)
+utils.tulis_manual("8_asal_usul_bobot_gru",
+                   "Asal-Usul Bobot GRU (Inisialisasi sampai Bobot Akhir)",
+                   isi_asal_bobot_gru)
 ''')
 
 # =========================================================================== #
