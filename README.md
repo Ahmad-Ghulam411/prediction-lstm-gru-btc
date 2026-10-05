@@ -179,8 +179,8 @@ rm data/dataset_bitcoin.csv
 | 4 | Pembagian data (sebelum normalisasi) | — |
 | 5 | Normalisasi Min-Max | $x' = (x - x_{min})/(x_{max} - x_{min})$ |
 | 6 | Pembentukan *sliding window* | susunan jendela pertama |
-| 7 | Model LSTM | jumlah parameter **dan** *forward pass* lengkap |
-| 8 | Model GRU | jumlah parameter **dan** *forward pass* lengkap |
+| 7 | Model LSTM | jumlah parameter, *forward pass* lengkap, **dan** asal-usul bobot (batas Glorot $n_{in}$/$n_{out}$, jumlah batch, satu langkah Adam, jejak bobot) |
+| 8 | Model GRU | jumlah parameter, *forward pass* lengkap, **dan** asal-usul bobot (batas Glorot $n_{in}$/$n_{out}$, jumlah batch, satu langkah Adam, jejak bobot) |
 | 9 | Perbandingan arsitektur dan kestabilan | reproduksibilitas *seed* |
 | 10 | Denormalisasi | $x = x'(x_{max} - x_{min}) + x_{min}$ |
 | 11 | Evaluasi model | RMSE, MAE, MAPE, akurasi arah |
