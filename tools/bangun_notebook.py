@@ -131,6 +131,7 @@ sys.path.insert(0, os.path.join(DIR_PROYEK, "src"))
 import utils                      # header, format angka, penyimpanan tabel/gambar
 import data as modul_data         # pengumpulan data Blockchain.com
 import metrik                     # RMSE, MAE, MAPE, akurasi arah, Diebold-Mariano
+import manual_pelatihan           # simulasi manual pelatihan LSTM & GRU (model mini)
 
 tf.get_logger().setLevel("ERROR")   # redam pesan retracing tf.function
 
@@ -586,7 +587,8 @@ tulis("  OK Hasil manual SAMA dengan hasil model (toleransi 1e-5)")
 
 print("\n✔ Hasil manual SAMA dengan hasil model")
 
-utils.tulis_manual(2, "Rata-rata dan Standar Deviasi Close Price", f"""
+utils.tulis_manual("02_08", "rata_rata_dan_standar_deviasi_close_price",
+                   "Rata-rata dan Standar Deviasi Close Price", f"""
 ## Rumus
 
 $$\\bar{{x}} = \\frac{{1}}{{n}}\\sum_{{i=1}}^{{n}} x_i
@@ -1100,7 +1102,7 @@ tulis("  OK Denormalisasi mengembalikan nilai asli dengan tepat.")
 
 print("\n✔ Hasil manual SAMA dengan hasil model")
 
-utils.tulis_manual(5, "Normalisasi Min-Max Close Price", f"""
+utils.tulis_manual("05_04", "normalisasi_min_max_close_price", "Normalisasi Min-Max Close Price", f"""
 ## Rumus
 
 $$x' = \\frac{{x - x_{{min}}}}{{x_{{max}} - x_{{min}}}}$$
@@ -1293,7 +1295,7 @@ tulis("  OK Hasil manual SAMA dengan hasil model (toleransi 1e-5)")
 
 print("\n✔ Hasil manual SAMA dengan hasil model")
 
-utils.tulis_manual(6, "Pembentukan Sliding Window", f"""
+utils.tulis_manual("06_02", "sliding_window", "Pembentukan Sliding Window", f"""
 ## Rumus
 
 $$\\mathbf{{X}}^{{(i)}} = \\left[\\mathbf{{x}}_{{t-6}}, \\mathbf{{x}}_{{t-5}}, \\ldots,
@@ -1516,8 +1518,66 @@ print(f"    Grid epoch       : {CONFIG['EPOCH_GRID']}")
 print(f"    Jumlah kombinasi : {len(CONFIG['NEURON_GRID']) * len(CONFIG['EPOCH_GRID'])} model per arsitektur")
 ''')
 
+md(r'''
+### 7.E Simulasi manual satu siklus pelatihan LSTM (model mini)
+
+Sebelum 15 model LSTM dilatih, subbagian 7.1 sampai 7.4 memperlihatkan **apa yang
+sebenarnya terjadi saat model dilatih**, memakai model mini (1 neuron, 1 fitur,
+2 *time step*, 1 sampel) yang bisa dihitung dengan tangan. Rumusnya sama dengan rumus
+Keras pada 7.A.
+
+| Subbagian | Isi |
+|---|---|
+| 7.1 | Alur sel LSTM (Gambar 1-6) dengan contoh angka |
+| 7.2 | Langkah 1-2: *forward pass* dan loss MSE |
+| 7.3 | Langkah 3: *backpropagation through time* (gradien setiap bobot dan bias) |
+| 7.4 | Langkah 4: update Adam, lalu siklus diulang 500 kali |
+
+Setelah model sungguhan dilatih (7.5-7.9), subbagian 7.10 membaca kurva loss-nya,
+7.11 memverifikasi *forward pass*-nya, dan 7.12 membahas bias. Setiap perhitungan
+manual disimpan sebagai `outputs/perhitungan_manual/tahap_07_SS_*.md`.
+''')
+
 kode(r'''
-utils.cetak_sub("7.1 Tuning hyperparameter LSTM (5 neuron x 3 epoch = 15 model)")
+utils.cetak_sub("7.1 PERHITUNGAN MANUAL — alur sel LSTM (Gambar 1-6) dengan model mini")
+
+# Konteks penelitian dan model mini dipakai bersama oleh Tahap 7, 8, dan 9
+konteks_pelatihan = manual_pelatihan.konteks_penelitian(
+    n_latih=len(X_latih), n_val=len(X_val), lookback=LOOKBACK, n_fitur=JUMLAH_FITUR,
+    batch=CONFIG["BATCH_SIZE"], lr=CONFIG["LEARNING_RATE"],
+    neuron_grid=CONFIG["NEURON_GRID"], epoch_grid=CONFIG["EPOCH_GRID"],
+    x_min=penskala_y.data_min_[0], x_max=penskala_y.data_max_[0],
+)
+sim_lstm = manual_pelatihan.Simulasi("LSTM")
+
+isi = manual_pelatihan.alur_sel(sim_lstm, konteks_pelatihan)
+utils.tampilkan_markdown(isi)
+utils.tulis_manual(*manual_pelatihan.berkas("LSTM", "alur_sel"), isi)
+''')
+
+kode(r'''
+utils.cetak_sub("7.2 PERHITUNGAN MANUAL — simulasi langkah 1-2: forward pass dan loss (LSTM)")
+isi = manual_pelatihan.forward_loss(sim_lstm, konteks_pelatihan)
+utils.tampilkan_markdown(isi)
+utils.tulis_manual(*manual_pelatihan.berkas("LSTM", "forward_loss"), isi)
+''')
+
+kode(r'''
+utils.cetak_sub("7.3 PERHITUNGAN MANUAL — simulasi langkah 3: backpropagation through time (LSTM)")
+isi = manual_pelatihan.bptt(sim_lstm, konteks_pelatihan)
+utils.tampilkan_markdown(isi)
+utils.tulis_manual(*manual_pelatihan.berkas("LSTM", "bptt"), isi)
+''')
+
+kode(r'''
+utils.cetak_sub("7.4 PERHITUNGAN MANUAL — simulasi langkah 4: update Adam (LSTM)")
+isi = manual_pelatihan.adam(sim_lstm, konteks_pelatihan)
+utils.tampilkan_markdown(isi)
+utils.tulis_manual(*manual_pelatihan.berkas("LSTM", "adam"), isi)
+''')
+
+kode(r'''
+utils.cetak_sub("7.5 Tuning hyperparameter LSTM (5 neuron x 3 epoch = 15 model)")
 
 
 def jalankan_tuning(tipe: str):
@@ -1573,7 +1633,7 @@ tabel_tuning_lstm, kumpulan_lstm = jalankan_tuning("LSTM")
 ''')
 
 kode(r'''
-utils.cetak_sub("7.2 Tabel 9 — Hasil tuning hyperparameter model LSTM")
+utils.cetak_sub("7.6 Tabel 9 — Hasil tuning hyperparameter model LSTM")
 
 posisi_terbaik_lstm = int(tabel_tuning_lstm["RMSE Validasi (USD)"].idxmin())
 tabel_tampil_lstm = tabel_tuning_lstm.copy()
@@ -1601,10 +1661,10 @@ print(f"    Jumlah parameter     : {utils.fmt_int(model_lstm.count_params())}")
 ''')
 
 kode(r'''
-utils.cetak_sub("7.3 Ringkasan arsitektur model LSTM terbaik")
+utils.cetak_sub("7.7 Ringkasan arsitektur model LSTM terbaik")
 model_lstm.summary(print_fn=lambda t: print("  " + t))
 
-utils.cetak_sub("7.4 PERHITUNGAN MANUAL — jumlah parameter LSTM")
+utils.cetak_sub("7.8 PERHITUNGAN MANUAL — jumlah parameter LSTM")
 
 baris_manual = []
 
@@ -1673,7 +1733,7 @@ tulis("  OK Hasil manual SAMA dengan hasil model")
 
 print("\n✔ Hasil manual SAMA dengan hasil model")
 
-utils.cetak_sub("7.5 Bentuk dan contoh nilai bobot asli Keras")
+utils.cetak_sub("7.9 Bentuk dan contoh nilai bobot asli Keras")
 lapisan_lstm = model_lstm.get_layer("lapisan_rekuren")
 W_lstm, U_lstm, b_lstm = [w.astype(np.float64) for w in lapisan_lstm.get_weights()]
 Wy_lstm, by_lstm = [w.astype(np.float64)
@@ -1708,7 +1768,7 @@ print()
 print(tabel_bobot.to_string(index=False))
 utils.simpan_tabel(tabel_bobot, 10, "Rincian bobot dan jumlah parameter model LSTM terbaik")
 
-utils.tulis_manual(7, "Jumlah Parameter Model LSTM", f"""
+utils.tulis_manual(*manual_pelatihan.berkas("LSTM", "jumlah_parameter"), f"""
 ## Rumus
 
 $$\\text{{Param}}_{{\\text{{LSTM}}}} = 4 \\times \\left(n_{{unit}} \\times
@@ -1733,7 +1793,7 @@ Model LSTM terbaik ({n_unit} neuron) memiliki
 ''')
 
 kode(r'''
-utils.cetak_sub("7.6 Gambar 3 — Kurva loss latih dan validasi model LSTM terbaik")
+utils.cetak_sub("7.10 Gambar 3 — Kurva loss latih dan validasi model LSTM terbaik")
 
 loss_latih = riwayat_lstm.history["loss"]
 loss_val = riwayat_lstm.history["val_loss"]
@@ -1757,7 +1817,7 @@ sumbu[1].legend()
 
 fig.suptitle("Gambar 3. Kurva Loss Latih dan Validasi Model LSTM Terbaik", fontsize=12, y=1.02)
 fig.tight_layout()
-utils.simpan_gambar(fig, 3, "Kurva loss latih dan validasi model LSTM terbaik")
+path_gambar_loss_lstm = utils.simpan_gambar(fig, 3, "Kurva loss latih dan validasi model LSTM terbaik")
 plt.show()
 
 print(f"\n  Loss latih    epoch pertama : {loss_latih[0]:.8f}")
@@ -1770,11 +1830,22 @@ print(f"  Penurunan loss latih        : "
 print("\n  Interpretasi: loss latih dan loss validasi menurun bersama-sama pada")
 print("  awal pelatihan. Jika loss validasi mulai naik sementara loss latih terus")
 print("  menurun, itu tanda overfitting; pemilihan jumlah epoch lewat data")
-print("  validasi pada Tahap 7.1 sudah memperhitungkan hal ini.")
+print("  validasi pada Tahap 7.5 sudah memperhitungkan hal ini.")
+''')
+
+kode(r'''
+utils.cetak_sub("7.10 (lanjutan) PERHITUNGAN MANUAL — membaca kurva loss LSTM")
+hasil_lstm = manual_pelatihan.hasil_model(
+    "LSTM", neuron_lstm, epoch_lstm, tabel_tuning_lstm, riwayat_lstm.history,
+    model_lstm.get_weights(), os.path.relpath(path_gambar_loss_lstm, utils.DIR_MANUAL),
+)
+isi = manual_pelatihan.kurva_loss("LSTM", konteks_pelatihan, hasil_lstm)
+utils.tampilkan_markdown(isi)
+utils.tulis_manual(*manual_pelatihan.berkas("LSTM", "kurva_loss"), isi)
 ''')
 
 md(r'''
-### 7.E Verifikasi manual *forward pass* LSTM (bagian terpenting)
+### 7.F Verifikasi manual *forward pass* LSTM (bagian terpenting)
 
 Bagian ini membuktikan bahwa **rumus LSTM yang ditulis di Bab III benar-benar
 rumus yang dijalankan Keras**. Caranya: bobot hasil pelatihan diambil apa adanya,
@@ -1802,7 +1873,7 @@ $$\mathbf{h}_0, \mathbf{c}_0 = \mathbf{0}
 ''')
 
 kode(r'''
-utils.cetak_sub("7.7 PERHITUNGAN MANUAL — forward pass LSTM (jendela pertama data uji)")
+utils.cetak_sub("7.11 PERHITUNGAN MANUAL — forward pass LSTM (jendela pertama data uji)")
 
 baris_manual = []
 
@@ -2015,7 +2086,7 @@ tulis("gerbang keluaran, hidden state, dan lapisan Dense — seluruhnya terbukti
 
 print("\n✔ Hasil manual SAMA dengan hasil model")
 
-utils.tulis_manual("7_forward_pass_lstm", "Forward Pass LSTM (Jendela Pertama Data Uji)", f"""
+utils.tulis_manual(*manual_pelatihan.berkas("LSTM", "forward_pass"), f"""
 ## Rumus yang diverifikasi
 
 $$\\mathbf{{f}}_t = \\sigma(\\mathbf{{x}}_t\\mathbf{{W}}_f + \\mathbf{{h}}_{{t-1}}\\mathbf{{U}}_f + \\mathbf{{b}}_f)
@@ -2050,7 +2121,14 @@ LSTM yang ditulis pada Bab III terbukti identik dengan implementasi Keras.
 ''')
 
 kode(r'''
-utils.cetak_sub("7.8 Prediksi model LSTM pada data uji")
+utils.cetak_sub("7.12 PERHITUNGAN MANUAL — bias pada LSTM: peran dan cara menghitungnya")
+isi = manual_pelatihan.bias(sim_lstm, konteks_pelatihan, hasil_lstm)
+utils.tampilkan_markdown(isi)
+utils.tulis_manual(*manual_pelatihan.berkas("LSTM", "bias"), isi)
+''')
+
+kode(r'''
+utils.cetak_sub("7.13 Prediksi model LSTM pada data uji")
 
 prediksi_uji_lstm_norm = model_lstm.predict(X_uji, verbose=0).ravel()
 prediksi_uji_lstm_usd = ke_usd(prediksi_uji_lstm_norm)
@@ -2130,13 +2208,13 @@ $$\mathbf{h}_t = \mathbf{z}_t \odot \mathbf{h}_{t-1} + \left(1 - \mathbf{z}_t\ri
 
 **5. Lapisan keluaran:** $\hat{y} = \mathbf{h}_T\mathbf{W}_y + b_y$
 
-### 8.B Perbedaan dengan rumus GRU pada buku teks (Cho dkk., 2014)
+### 8.B Perbedaan dengan rumus GRU pada makalah asli dan buku teks
 
-| Aspek | Cho dkk. (2014) | Keras (`reset_after=True`) |
-|---|---|---|
-| Posisi penerapan gerbang reset | **sebelum** perkalian matriks: $\tanh\!\left(\mathbf{x}_t\mathbf{W}_h + (\mathbf{r}_t \odot \mathbf{h}_{t-1})\mathbf{U}_h\right)$ | **sesudah** perkalian matriks: $\tanh\!\left(\mathbf{x}_t\mathbf{W}_h + \mathbf{r}_t \odot (\mathbf{h}_{t-1}\mathbf{U}_h)\right)$ |
-| Peran gerbang $\mathbf{z}_t$ | $\mathbf{h}_t = (1-\mathbf{z}_t)\odot\mathbf{h}_{t-1} + \mathbf{z}_t\odot\tilde{\mathbf{h}}_t$ — $\mathbf{z}$ = bobot **informasi baru** | $\mathbf{h}_t = \mathbf{z}_t\odot\mathbf{h}_{t-1} + (1-\mathbf{z}_t)\odot\tilde{\mathbf{h}}_t$ — $\mathbf{z}$ = bobot **memori lama** |
-| Jumlah bias | satu himpunan, $3 \times n_{unit}$ | **dua** himpunan, $(2, 3 \times n_{unit})$ |
+| Aspek | Cho dkk. (2014) | Chung dkk. (2014), banyak buku teks | Keras (`reset_after=True`) |
+|---|---|---|---|
+| Posisi penerapan gerbang reset | **sebelum** perkalian matriks: $\tanh\!\left(\mathbf{x}_t\mathbf{W}_h + (\mathbf{r}_t \odot \mathbf{h}_{t-1})\mathbf{U}_h\right)$ | **sebelum** perkalian matriks (sama dengan Cho dkk.) | **sesudah** perkalian matriks: $\tanh\!\left(\mathbf{x}_t\mathbf{W}_h + \mathbf{r}_t \odot (\mathbf{h}_{t-1}\mathbf{U}_h)\right)$ |
+| Peran gerbang $\mathbf{z}_t$ | $\mathbf{h}_t = \mathbf{z}_t\odot\mathbf{h}_{t-1} + (1-\mathbf{z}_t)\odot\tilde{\mathbf{h}}_t$ (persamaan 7 makalahnya) — $\mathbf{z}$ = bobot **memori lama** | $\mathbf{h}_t = (1-\mathbf{z}_t)\odot\mathbf{h}_{t-1} + \mathbf{z}_t\odot\tilde{\mathbf{h}}_t$ — $\mathbf{z}$ = bobot **informasi baru** | $\mathbf{h}_t = \mathbf{z}_t\odot\mathbf{h}_{t-1} + (1-\mathbf{z}_t)\odot\tilde{\mathbf{h}}_t$ — sama dengan Cho dkk. |
+| Jumlah bias | tidak dituliskan ("*we omit biases*") | satu himpunan, $3 \times n_{unit}$ | **dua** himpunan, $(2, 3 \times n_{unit})$ |
 
 **Mengapa Keras memakai bentuk ini?** Dengan menerapkan $\mathbf{r}_t$ *setelah*
 perkalian matriks, seluruh perkalian $\mathbf{h}_{t-1}\mathbf{U}$ untuk ketiga
@@ -2146,7 +2224,8 @@ $\mathbf{b}^{(in)}$ untuk jalur masukan dan $\mathbf{b}^{(rec)}$ untuk jalur
 rekuren.
 
 $\Rightarrow$ **Perhitungan manual pada tahap ini WAJIB mengikuti rumus Keras
-di atas**, bukan rumus buku teks, agar hasilnya sama dengan `model.predict()`.
+di atas**, bukan rumus Cho dkk. atau buku teks, agar hasilnya sama dengan
+`model.predict()`.
 Perbedaan kedua konvensi bersifat *reparameterisasi*: keduanya sama-sama sah
 sebagai GRU, hanya berbeda cara penulisan dan tempat bias.
 
@@ -2174,10 +2253,59 @@ memakai fungsi `bangun_model()` dan `latih_model()` yang identik. Satu-satunya
 perbedaan adalah jenis lapisan rekuren.
 ''')
 
+md(r'''
+### 8.F Simulasi manual satu siklus pelatihan GRU (model mini)
+
+Sama seperti Tahap 7, sebelum 15 model GRU dilatih, subbagian 8.1 sampai 8.4
+memperlihatkan satu siklus pelatihan GRU pada model mini (1 neuron, 1 fitur,
+2 *time step*, 1 sampel) dengan rumus Keras pada 8.A:
+
+| Subbagian | Isi |
+|---|---|
+| 8.1 | Alur sel GRU (Gambar 7) dengan contoh angka |
+| 8.2 | Langkah 1-2: *forward pass* dan loss MSE |
+| 8.3 | Langkah 3: *backpropagation through time* (gradien setiap bobot dan bias) |
+| 8.4 | Langkah 4: update Adam, lalu siklus diulang 500 kali |
+
+Setelah model sungguhan dilatih (8.5-8.9), subbagian 8.10 membaca kurva loss-nya,
+8.11 memverifikasi *forward pass*-nya, dan 8.12 membahas bias, termasuk dua jenis bias
+GRU. Setiap perhitungan manual disimpan sebagai
+`outputs/perhitungan_manual/tahap_08_SS_*.md`.
+''')
+
 kode(r'''
 utils.cetak_header(8, "Model GRU")
 
-utils.cetak_sub("8.1 Tuning hyperparameter GRU (5 neuron x 3 epoch = 15 model)")
+utils.cetak_sub("8.1 PERHITUNGAN MANUAL — alur sel GRU (Gambar 7) dengan model mini")
+sim_gru = manual_pelatihan.Simulasi("GRU")
+isi = manual_pelatihan.alur_sel(sim_gru, konteks_pelatihan)
+utils.tampilkan_markdown(isi)
+utils.tulis_manual(*manual_pelatihan.berkas("GRU", "alur_sel"), isi)
+''')
+
+kode(r'''
+utils.cetak_sub("8.2 PERHITUNGAN MANUAL — simulasi langkah 1-2: forward pass dan loss (GRU)")
+isi = manual_pelatihan.forward_loss(sim_gru, konteks_pelatihan)
+utils.tampilkan_markdown(isi)
+utils.tulis_manual(*manual_pelatihan.berkas("GRU", "forward_loss"), isi)
+''')
+
+kode(r'''
+utils.cetak_sub("8.3 PERHITUNGAN MANUAL — simulasi langkah 3: backpropagation through time (GRU)")
+isi = manual_pelatihan.bptt(sim_gru, konteks_pelatihan)
+utils.tampilkan_markdown(isi)
+utils.tulis_manual(*manual_pelatihan.berkas("GRU", "bptt"), isi)
+''')
+
+kode(r'''
+utils.cetak_sub("8.4 PERHITUNGAN MANUAL — simulasi langkah 4: update Adam (GRU)")
+isi = manual_pelatihan.adam(sim_gru, konteks_pelatihan)
+utils.tampilkan_markdown(isi)
+utils.tulis_manual(*manual_pelatihan.berkas("GRU", "adam"), isi)
+''')
+
+kode(r'''
+utils.cetak_sub("8.5 Tuning hyperparameter GRU (5 neuron x 3 epoch = 15 model)")
 print("  Memakai fungsi bangun_model() dan latih_model() YANG SAMA dengan Tahap 7,")
 print("  dengan data, grid, batch size, optimizer, dan seed yang identik.\n")
 
@@ -2185,7 +2313,7 @@ tabel_tuning_gru, kumpulan_gru = jalankan_tuning("GRU")
 ''')
 
 kode(r'''
-utils.cetak_sub("8.2 Tabel 11 — Hasil tuning hyperparameter model GRU")
+utils.cetak_sub("8.6 Tabel 11 — Hasil tuning hyperparameter model GRU")
 
 posisi_terbaik_gru = int(tabel_tuning_gru["RMSE Validasi (USD)"].idxmin())
 tabel_tampil_gru = tabel_tuning_gru.copy()
@@ -2211,12 +2339,12 @@ print(f"    Waktu latih          : {waktu_gru:,.2f} detik "
       f"({waktu_gru / epoch_gru:.4f} detik/epoch)")
 print(f"    Jumlah parameter     : {utils.fmt_int(model_gru.count_params())}")
 
-utils.cetak_sub("8.3 Ringkasan arsitektur model GRU terbaik")
+utils.cetak_sub("8.7 Ringkasan arsitektur model GRU terbaik")
 model_gru.summary(print_fn=lambda t: print("  " + t))
 ''')
 
 kode(r'''
-utils.cetak_sub("8.4 PERHITUNGAN MANUAL — jumlah parameter GRU")
+utils.cetak_sub("8.8 PERHITUNGAN MANUAL — jumlah parameter GRU")
 
 baris_manual = []
 
@@ -2292,7 +2420,7 @@ tulis("  OK Hasil manual SAMA dengan hasil model")
 
 print("\n✔ Hasil manual SAMA dengan hasil model")
 
-utils.cetak_sub("8.5 Bentuk dan contoh nilai bobot asli Keras (GRU)")
+utils.cetak_sub("8.9 Bentuk dan contoh nilai bobot asli Keras (GRU)")
 lapisan_gru = model_gru.get_layer("lapisan_rekuren")
 bobot_gru_mentah = lapisan_gru.get_weights()
 W_gru, U_gru, b_gru = [w.astype(np.float64) for w in bobot_gru_mentah]
@@ -2331,7 +2459,7 @@ print()
 print(tabel_bobot_gru.to_string(index=False))
 utils.simpan_tabel(tabel_bobot_gru, 12, "Rincian bobot dan jumlah parameter model GRU terbaik")
 
-utils.tulis_manual(8, "Jumlah Parameter Model GRU", f"""
+utils.tulis_manual(*manual_pelatihan.berkas("GRU", "jumlah_parameter"), f"""
 ## Rumus
 
 $$\\text{{Param}}_{{\\text{{GRU}}}} = 3 \\times \\left(n_{{unit}} \\times
@@ -2358,7 +2486,7 @@ Model GRU terbaik ({n_unit_gru} neuron) memiliki
 ''')
 
 kode(r'''
-utils.cetak_sub("8.6 Gambar 4 — Kurva loss latih dan validasi model GRU terbaik")
+utils.cetak_sub("8.10 Gambar 4 — Kurva loss latih dan validasi model GRU terbaik")
 
 loss_latih_gru = riwayat_gru.history["loss"]
 loss_val_gru = riwayat_gru.history["val_loss"]
@@ -2386,7 +2514,7 @@ sumbu[1].legend()
 
 fig.suptitle("Gambar 4. Kurva Loss Latih dan Validasi Model GRU Terbaik", fontsize=12, y=1.02)
 fig.tight_layout()
-utils.simpan_gambar(fig, 4, "Kurva loss latih dan validasi model GRU terbaik")
+path_gambar_loss_gru = utils.simpan_gambar(fig, 4, "Kurva loss latih dan validasi model GRU terbaik")
 plt.show()
 
 print(f"\n  Loss latih    epoch pertama : {loss_latih_gru[0]:.8f}")
@@ -2398,10 +2526,21 @@ print(f"  Penurunan loss latih        : "
       f"{(1 - loss_latih_gru[-1] / loss_latih_gru[0]) * 100:.2f}% dari epoch pertama")
 ''')
 
-md(r'''
-### 8.F Verifikasi manual *forward pass* GRU
+kode(r'''
+utils.cetak_sub("8.10 (lanjutan) PERHITUNGAN MANUAL — membaca kurva loss GRU")
+hasil_gru = manual_pelatihan.hasil_model(
+    "GRU", neuron_gru, epoch_gru, tabel_tuning_gru, riwayat_gru.history,
+    model_gru.get_weights(), os.path.relpath(path_gambar_loss_gru, utils.DIR_MANUAL),
+)
+isi = manual_pelatihan.kurva_loss("GRU", konteks_pelatihan, hasil_gru)
+utils.tampilkan_markdown(isi)
+utils.tulis_manual(*manual_pelatihan.berkas("GRU", "kurva_loss"), isi)
+''')
 
-Sama seperti Tahap 7.E, bagian ini menghitung ulang $\hat{y}$ dari nol dengan
+md(r'''
+### 8.G Verifikasi manual *forward pass* GRU
+
+Sama seperti 7.F, bagian ini menghitung ulang $\hat{y}$ dari nol dengan
 NumPy memakai bobot hasil pelatihan, lalu membandingkannya dengan
 `model.predict()`.
 
@@ -2414,12 +2553,12 @@ $$\mathbf{h}_t = \mathbf{z}_t \odot \mathbf{h}_{t-1} + \left(1-\mathbf{z}_t\righ
 
 Keadaan awal $\mathbf{h}_0 = \mathbf{0}$ (GRU tidak memiliki $\mathbf{c}_t$).
 Pada akhir bagian ini juga ditunjukkan secara numerik bahwa memakai rumus buku
-teks Cho dkk. (2014) **akan menghasilkan angka yang berbeda**, sebagai bukti
+teks Cho dkk. (2014) maupun Chung dkk. (2014) **akan menghasilkan angka yang berbeda**, sebagai bukti
 mengapa konvensi Keras harus dipakai.
 ''')
 
 kode(r'''
-utils.cetak_sub("8.7 PERHITUNGAN MANUAL — forward pass GRU (jendela pertama data uji)")
+utils.cetak_sub("8.11 PERHITUNGAN MANUAL — forward pass GRU (jendela pertama data uji)")
 
 baris_manual = []
 
@@ -2609,37 +2748,49 @@ assert selisih_gru < 1e-5, "Forward pass manual GRU tidak cocok dengan Keras"
 tulis("  OK Hasil manual SAMA dengan hasil model (toleransi 1e-5)")
 tulis()
 
-# --- Bukti numerik: rumus buku teks memberi hasil berbeda ------------------ #
-tulis("(f) BUKTI NUMERIK — RUMUS BUKU TEKS (CHO DKK., 2014) MEMBERI HASIL BERBEDA")
+# --- Bukti numerik: rumus GRU lain memberi hasil berbeda ------------------ #
+tulis("(f) BUKTI NUMERIK — RUMUS GRU LAIN MEMBERI HASIL BERBEDA")
 tulis()
-tulis("Rumus Cho dkk. (2014):")
+tulis("(f.1) Rumus asli Cho dkk. (2014), persamaan (7)-(8) makalahnya:")
+tulis("  h~_t = tanh( x_t.W_h + (r_t * h_(t-1)).U_h )      <- reset SEBELUM perkalian")
+tulis("  h_t  = z_t * h_(t-1) + (1 - z_t) * h~_t            <- peran z SAMA dengan Keras")
+tulis("(f.2) Rumus Chung dkk. (2014), yang banyak dipakai buku teks:")
 tulis("  h~_t = tanh( x_t.W_h + (r_t * h_(t-1)).U_h )      <- reset SEBELUM perkalian")
 tulis("  h_t  = (1 - z_t) * h_(t-1) + z_t * h~_t            <- peran z tertukar")
 tulis()
-h_cho = np.zeros(ug, dtype=np.float64)
-for t in range(LOOKBACK):
-    x_t = jendela_uji[t]
-    h_sebelum = h_cho.copy()
-    z_c = sigmoid(x_t @ W_z + h_sebelum @ U_z + bz_in + bz_rec)
-    r_c = sigmoid(x_t @ W_r + h_sebelum @ U_r + br_in + br_rec)
-    h_kandidat_cho = np.tanh(x_t @ W_h + bh_in + (r_c * h_sebelum) @ U_h + bh_rec)
-    h_cho = (1.0 - z_c) * h_sebelum + z_c * h_kandidat_cho
-y_hat_cho = float(h_cho @ Wy_gru.ravel() + by_gru[0])
+
+
+def forward_gru_lain(z_tertukar: bool) -> float:
+    """Forward pass GRU dengan reset SEBELUM perkalian matriks (bobot yang sama)."""
+    h = np.zeros(ug, dtype=np.float64)
+    for t in range(LOOKBACK):
+        x_t = jendela_uji[t]
+        z_c = sigmoid(x_t @ W_z + h @ U_z + bz_in + bz_rec)
+        r_c = sigmoid(x_t @ W_r + h @ U_r + br_in + br_rec)
+        h_kandidat = np.tanh(x_t @ W_h + bh_in + (r_c * h) @ U_h + bh_rec)
+        h = (1.0 - z_c) * h + z_c * h_kandidat if z_tertukar else z_c * h + (1.0 - z_c) * h_kandidat
+    return float(h @ Wy_gru.ravel() + by_gru[0])
+
+
+y_hat_cho = forward_gru_lain(z_tertukar=False)
+y_hat_chung = forward_gru_lain(z_tertukar=True)
 
 tulis(f"  y_hat dengan rumus Keras (reset_after=True) : {y_hat_manual_gru:.10f}")
-tulis(f"  y_hat dengan rumus buku teks Cho dkk.       : {y_hat_cho:.10f}")
-tulis(f"  Selisih                                     : "
-      f"{abs(y_hat_manual_gru - y_hat_cho):.6e}")
+tulis(f"  y_hat dengan rumus Cho dkk. (2014)          : {y_hat_cho:.10f}"
+      f"   (selisih {abs(y_hat_manual_gru - y_hat_cho):.6e})")
+tulis(f"  y_hat dengan rumus Chung dkk. (2014)        : {y_hat_chung:.10f}"
+      f"   (selisih {abs(y_hat_manual_gru - y_hat_chung):.6e})")
 tulis(f"  Dalam USD: Keras = {utils.fmt_usd(y_hat_manual_gru_usd)} USD, "
-      f"Cho dkk. = {utils.fmt_usd(float(ke_usd([y_hat_cho])[0]))} USD")
+      f"Cho dkk. = {utils.fmt_usd(float(ke_usd([y_hat_cho])[0]))} USD, "
+      f"Chung dkk. = {utils.fmt_usd(float(ke_usd([y_hat_chung])[0]))} USD")
 tulis()
-tulis("Kesimpulan: kedua rumus sama-sama sah sebagai GRU, tetapi menghasilkan")
+tulis("Kesimpulan: ketiga rumus sama-sama sah sebagai GRU, tetapi menghasilkan")
 tulis("angka yang berbeda untuk himpunan bobot yang sama. Karena bobot di sini")
 tulis("dilatih oleh Keras, perhitungan manual WAJIB memakai konvensi Keras.")
 
 print("\n✔ Hasil manual SAMA dengan hasil model")
 
-utils.tulis_manual("8_forward_pass_gru", "Forward Pass GRU (Jendela Pertama Data Uji)", f"""
+utils.tulis_manual(*manual_pelatihan.berkas("GRU", "forward_pass"), f"""
 ## Rumus yang diverifikasi (konvensi Keras, `reset_after=True`)
 
 $$\\mathbf{{z}}_t = \\sigma\\!\\left(\\mathbf{{x}}_t\\mathbf{{W}}_z + \\mathbf{{h}}_{{t-1}}\\mathbf{{U}}_z
@@ -2670,15 +2821,24 @@ Prediksi hasil hitung tangan dengan NumPy sebesar `{y_hat_manual_gru:.10f}`
 `model.predict()` menghasilkan `{y_hat_keras_gru:.10f}` dengan selisih hanya
 {selisih_gru:.2e} — jauh di bawah toleransi $10^{{-5}}$.
 
-Sebaliknya, memakai rumus buku teks Cho dkk. (2014) pada himpunan bobot yang
-sama menghasilkan `{y_hat_cho:.10f}`, yaitu berbeda
-{abs(y_hat_manual_gru - y_hat_cho):.2e}. Hal ini membuktikan pentingnya memakai
+Sebaliknya, pada himpunan bobot yang sama, rumus Cho dkk. (2014) (gerbang reset
+sebelum perkalian matriks) menghasilkan `{y_hat_cho:.10f}` (berbeda
+{abs(y_hat_manual_gru - y_hat_cho):.2e}), dan rumus Chung dkk. (2014) (peran
+$\\mathbf{{z}}_t$ tertukar) menghasilkan `{y_hat_chung:.10f}` (berbeda
+{abs(y_hat_manual_gru - y_hat_chung):.2e}). Hal ini membuktikan pentingnya memakai
 konvensi Keras pada perhitungan manual skripsi.
 """)
 ''')
 
 kode(r'''
-utils.cetak_sub("8.8 Prediksi model GRU pada data uji")
+utils.cetak_sub("8.12 PERHITUNGAN MANUAL — bias pada GRU: peran, cara menghitung, dan dua jenis bias")
+isi = manual_pelatihan.bias(sim_gru, konteks_pelatihan, hasil_gru)
+utils.tampilkan_markdown(isi)
+utils.tulis_manual(*manual_pelatihan.berkas("GRU", "bias"), isi)
+''')
+
+kode(r'''
+utils.cetak_sub("8.13 Prediksi model GRU pada data uji")
 
 prediksi_uji_gru_norm = model_gru.predict(X_uji, verbose=0).ravel()
 prediksi_uji_gru_usd = ke_usd(prediksi_uji_gru_norm)
@@ -2717,8 +2877,8 @@ termasuk suku 2 x n_unit yang berasal dari reset_after=True. Forward pass
 manual juga menghasilkan angka identik dengan model.predict() (selisih
 {selisih_gru:.1e}).
 
-Sebagai tambahan, telah dibuktikan secara numerik bahwa rumus GRU buku teks
-Cho dkk. (2014) memberi hasil berbeda pada bobot yang sama, sehingga
+Sebagai tambahan, telah dibuktikan secara numerik bahwa rumus GRU Cho dkk.
+(2014) maupun Chung dkk. (2014) memberi hasil berbeda pada bobot yang sama, sehingga
 perhitungan manual di Bab III harus memakai konvensi Keras.
 """)
 ''')
@@ -2829,7 +2989,14 @@ print("  jumlah neuron yang sama, yaitu sekitar tiga perempat jumlah parameter L
 ''')
 
 kode(r'''
-utils.cetak_sub("9.2 Uji kestabilan — melatih ulang konfigurasi terbaik dengan 5 seed")
+utils.cetak_sub("9.2 PERHITUNGAN MANUAL — perbandingan struktur LSTM dan GRU")
+isi = manual_pelatihan.perbandingan(sim_lstm, sim_gru, konteks_pelatihan, hasil_lstm, hasil_gru)
+utils.tampilkan_markdown(isi)
+utils.tulis_manual(*manual_pelatihan.berkas("LSTM-GRU", "perbandingan"), isi)
+''')
+
+kode(r'''
+utils.cetak_sub("9.3 Uji kestabilan — melatih ulang konfigurasi terbaik dengan 5 seed")
 
 harga_sebelumnya_uji = df_bersih[KOLOM_TARGET].to_numpy()[idx_uji - 1]
 
@@ -2878,7 +3045,7 @@ tabel_kestabilan = pd.DataFrame(hasil_kestabilan)
 ''')
 
 kode(r'''
-utils.cetak_sub("9.3 Tabel 14 — Rekapitulasi uji kestabilan (rata-rata +/- standar deviasi)")
+utils.cetak_sub("9.4 Tabel 14 — Rekapitulasi uji kestabilan (rata-rata +/- standar deviasi)")
 
 rekap_kestabilan = tabel_kestabilan.groupby("Arsitektur").agg(
     **{
@@ -2950,7 +3117,7 @@ utils.simpan_tabel(tabel_kestabilan_simpan, 14, "Uji kestabilan model terhadap l
 ''')
 
 kode(r'''
-utils.cetak_sub("9.4 Verifikasi reproduksibilitas — seed 42 harus mengulang hasil Tahap 7 & 8")
+utils.cetak_sub("9.5 Verifikasi reproduksibilitas — seed 42 harus mengulang hasil Tahap 7 & 8")
 
 for tipe, prediksi_utama in [("LSTM", prediksi_uji_lstm_usd), ("GRU", prediksi_uji_gru_usd)]:
     prediksi_ulang_42 = prediksi_seed[tipe][CONFIG["SEED"]]
@@ -2962,7 +3129,7 @@ for tipe, prediksi_utama in [("LSTM", prediksi_uji_lstm_usd), ("GRU", prediksi_u
 print("\n  OK Pelatihan ulang dengan seed 42 menghasilkan prediksi yang sama:")
 print("  penguncian seed dan mode deterministik TensorFlow bekerja sebagaimana mestinya.")
 
-utils.cetak_sub("9.5 Gambar 5 — Sebaran RMSE data uji lintas seed")
+utils.cetak_sub("9.6 Gambar 5 — Sebaran RMSE data uji lintas seed")
 
 fig, sumbu = plt.subplots(1, 2, figsize=(13, 4.8))
 
@@ -3107,7 +3274,7 @@ tulis("  OK Hasil manual SAMA dengan hasil model (toleransi 1e-5)")
 
 print("\n✔ Hasil manual SAMA dengan hasil model")
 
-utils.tulis_manual(10, "Denormalisasi Prediksi ke Skala USD", f"""
+utils.tulis_manual("10_01", "denormalisasi", "Denormalisasi Prediksi ke Skala USD", f"""
 ## Rumus
 
 $$x = x' \\times \\left(x_{{max}} - x_{{min}}\\right) + x_{{min}}$$
@@ -3403,7 +3570,7 @@ print(f"\n  Model dengan RMSE data uji terkecil : {model_akurasi_terbaik}")
 print(f"  Selisih RMSE kedua model            : {utils.fmt_usd(selisih_rmse)} USD "
       f"({persen_selisih_rmse:.2f}% dari RMSE terbesar)")
 
-utils.tulis_manual(11, "Metrik Evaluasi (RMSE, MAE, MAPE, Akurasi Arah)", f"""
+utils.tulis_manual("11_01", "metrik_evaluasi", "Metrik Evaluasi (RMSE, MAE, MAPE, Akurasi Arah)", f"""
 ## Rumus
 
 $$RMSE = \\sqrt{{\\frac{{1}}{{n}}\\sum_{{t=1}}^{{n}}\\left(y_t - \\hat{{y}}_t\\right)^2}}
@@ -3698,7 +3865,7 @@ print()
 print(tabel_kesimpulan_dm.to_string(index=False))
 utils.simpan_tabel(tabel_kesimpulan_dm, 19, "Kesimpulan uji hipotesis Diebold-Mariano")
 
-utils.tulis_manual(12, "Uji Diebold-Mariano LSTM vs GRU", f"""
+utils.tulis_manual("12_01", "uji_diebold_mariano", "Uji Diebold-Mariano LSTM vs GRU", f"""
 ## Hipotesis
 
 $$H_0: E\\left[d_t\\right] = 0 \\qquad H_1: E\\left[d_t\\right] \\neq 0$$
@@ -4266,16 +4433,19 @@ print("  2. Perbandingan adil: LSTM dan GRU memakai data, window, grid, batch si
 print("     optimizer, learning rate, dan seed yang identik.")
 print("  3. Seluruh perhitungan manual (statistik deskriptif, normalisasi, window,")
 print("     jumlah parameter, forward pass LSTM & GRU, denormalisasi, metrik")
-print("     evaluasi, dan uji Diebold-Mariano) cocok dengan hasil library.")
+print("     evaluasi, dan uji Diebold-Mariano) cocok dengan hasil library, dan")
+print("     simulasi manual satu siklus pelatihan (forward, loss, BPTT, Adam) pada")
+print("     model mini LSTM & GRU lolos pemeriksaan gradien numerik.")
 print("  4. Data runtun waktu tidak diacak (shuffle=False) pada seluruh proses.")
 print("  5. Keterbatasan: model hanya memakai informasi 7 hari terakhir dan tidak")
 print("     mengenal rentang harga di luar data latih, sehingga cenderung")
 print("     underestimate pada periode harga memecahkan rekor.")
 print()
+utils.tulis_indeks_manual()
 print(garis)
 print("SELESAI — seluruh tabel tersimpan di outputs/tabel/,")
 print("gambar di outputs/gambar/, dan perhitungan manual di")
-print("outputs/perhitungan_manual/.")
+print("outputs/perhitungan_manual/ (daftar isinya: outputs/perhitungan_manual/README.md).")
 print(garis)
 ''')
 
