@@ -71,12 +71,14 @@ prediction-lstm-gru-btc/
 │   └── btc_lstm_vs_gru.ipynb           # NOTEBOOK UTAMA, sudah dieksekusi
 ├── src/                                # fungsi pendukung
 │   ├── data.py                         # pengambilan data Blockchain.com API
+│   ├── manual_pelatihan.py             # simulasi manual pelatihan LSTM & GRU (model mini)
 │   ├── metrik.py                       # RMSE, MAE, MAPE, akurasi arah, Diebold-Mariano
 │   └── utils.py                        # header tahap, format angka, penyimpanan tabel/gambar
 ├── outputs/
 │   ├── tabel/                          # seluruh tabel (.csv dan .xlsx)
 │   ├── gambar/                         # seluruh gambar (.png, 300 dpi)
-│   └── perhitungan_manual/             # perhitungan manual per tahap (.md)
+│   └── perhitungan_manual/             # perhitungan manual per subbagian (tahap_TT_SS_*.md)
+│                                       # dan daftar isinya (README.md)
 ├── tools/
 │   ├── bangun_notebook.py              # penyusun notebook (opsional)
 │   └── uji_cepat.py                    # uji cepat pipeline dengan grid kecil
@@ -179,9 +181,9 @@ rm data/dataset_bitcoin.csv
 | 4 | Pembagian data (sebelum normalisasi) | — |
 | 5 | Normalisasi Min-Max | $x' = (x - x_{min})/(x_{max} - x_{min})$ |
 | 6 | Pembentukan *sliding window* | susunan jendela pertama |
-| 7 | Model LSTM | jumlah parameter **dan** *forward pass* lengkap |
-| 8 | Model GRU | jumlah parameter **dan** *forward pass* lengkap |
-| 9 | Perbandingan arsitektur dan kestabilan | reproduksibilitas *seed* |
+| 7 | Model LSTM | penjabaran sigmoid dan tanh (persamaan 11-13), alur sel (Gambar 1-6), simulasi satu siklus pelatihan (*forward pass*, loss, BPTT, Adam), jumlah parameter, kurva loss, *forward pass* model terlatih, bias |
+| 8 | Model GRU | alur sel (Gambar 7), simulasi satu siklus pelatihan, jumlah parameter, kurva loss, *forward pass* model terlatih, dua jenis bias |
+| 9 | Perbandingan arsitektur dan kestabilan | perbandingan struktur LSTM dan GRU, reproduksibilitas *seed* |
 | 10 | Denormalisasi | $x = x'(x_{max} - x_{min}) + x_{min}$ |
 | 11 | Evaluasi model | RMSE, MAE, MAPE, akurasi arah |
 | 12 | Uji Diebold-Mariano | $d_t$, $\bar{d}$, $\gamma_0$, DM, DM\*, *p-value* |
@@ -191,7 +193,20 @@ rm data/dataset_bitcoin.csv
 Setiap perhitungan manual dilakukan **dua kali**: (a) langkah demi langkah
 dengan angka asli, lalu (b) dibandingkan dengan hasil *library* dan dicek dengan
 `assert` pada toleransi $10^{-5}$. Versi teksnya tersimpan di
-`outputs/perhitungan_manual/tahap_X.md` dan siap disalin ke Bab III.
+`outputs/perhitungan_manual/` dan siap disalin ke Bab III.
+
+**Penamaan berkas perhitungan manual.** Nama `tahap_TT_SS_nama.md` berarti Tahap TT,
+subbagian TT.SS di notebook (misalnya `tahap_07_08_jumlah_parameter_lstm.md` adalah
+subbagian 7.8), sehingga urutan berkas sama dengan urutan pengerjaan dari tahap 2
+sampai tahap 12. Daftar isinya ada di `outputs/perhitungan_manual/README.md`, dan setiap
+berkas diakhiri tautan ke berkas sebelumnya dan berikutnya.
+
+**Simulasi manual pelatihan (Tahap 7.1-7.4 dan 8.1-8.4).** Sebelum model sungguhan
+dilatih, notebook menghitung satu siklus pelatihan pada model mini (1 neuron, 1 fitur,
+2 *time step*, 1 sampel) dengan rumus Keras: alur sel, *forward pass*, loss MSE,
+*backpropagation through time*, dan update Adam. LSTM dan GRU dihitung terpisah pada
+tahapnya masing-masing; perbandingan strukturnya ada di Tahap 9.2. Perhitungannya ada di
+`src/manual_pelatihan.py` dan setiap gradien diperiksa dengan turunan numerik.
 
 ---
 

@@ -1,4 +1,4 @@
-# Perhitungan Manual - Tahap 11: Metrik Evaluasi (RMSE, MAE, MAPE, Akurasi Arah)
+# Perhitungan Manual - Tahap 11.1: Metrik Evaluasi (RMSE, MAE, MAPE, Akurasi Arah)
 
 ## Rumus
 
@@ -121,3 +121,13 @@ MODEL GRU
 
 Seluruh metrik hasil hitung tangan cocok dengan fungsi pada `src/metrik.py`
 sampai toleransi $10^{-5}$.
+
+<!-- navigasi-perhitungan-manual -->
+
+---
+
+← Sebelumnya: [Tahap 10.1: Denormalisasi Prediksi ke Skala USD](tahap_10_01_denormalisasi.md)
+
+[Daftar isi perhitungan manual](README.md)
+
+→ Berikutnya: [Tahap 12.1: Uji Diebold-Mariano LSTM vs GRU](tahap_12_01_uji_diebold_mariano.md)

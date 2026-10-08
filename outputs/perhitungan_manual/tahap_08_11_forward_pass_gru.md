@@ -1,4 +1,4 @@
-# Perhitungan Manual - Tahap 8: Forward Pass GRU (Jendela Pertama Data Uji)
+# Perhitungan Manual - Tahap 8.11: Forward Pass GRU (Jendela Pertama Data Uji)
 
 ## Rumus yang diverifikasi (konvensi Keras, `reset_after=True`)
 
@@ -173,18 +173,21 @@ RINCIAN TIMESTEP t = 2  (tanggal 2025-12-12)
 
   OK Hasil manual SAMA dengan hasil model (toleransi 1e-5)
 
-(f) BUKTI NUMERIK — RUMUS BUKU TEKS (CHO DKK., 2014) MEMBERI HASIL BERBEDA
+(f) BUKTI NUMERIK — RUMUS GRU LAIN MEMBERI HASIL BERBEDA
 
-Rumus Cho dkk. (2014):
+(f.1) Rumus asli Cho dkk. (2014), persamaan (7)-(8) makalahnya:
+  h~_t = tanh( x_t.W_h + (r_t * h_(t-1)).U_h )      <- reset SEBELUM perkalian
+  h_t  = z_t * h_(t-1) + (1 - z_t) * h~_t            <- peran z SAMA dengan Keras
+(f.2) Rumus Chung dkk. (2014), yang banyak dipakai buku teks:
   h~_t = tanh( x_t.W_h + (r_t * h_(t-1)).U_h )      <- reset SEBELUM perkalian
   h_t  = (1 - z_t) * h_(t-1) + z_t * h~_t            <- peran z tertukar
 
   y_hat dengan rumus Keras (reset_after=True) : 0.6476814983
-  y_hat dengan rumus buku teks Cho dkk.       : 0.5364631926
-  Selisih                                     : 1.112183e-01
-  Dalam USD: Keras = 88,762.92 USD, Cho dkk. = 77,841.64 USD
+  y_hat dengan rumus Cho dkk. (2014)          : 0.6086797567   (selisih 3.900174e-02)
+  y_hat dengan rumus Chung dkk. (2014)        : 0.5364631926   (selisih 1.112183e-01)
+  Dalam USD: Keras = 88,762.92 USD, Cho dkk. = 84,933.07 USD, Chung dkk. = 77,841.64 USD
 
-Kesimpulan: kedua rumus sama-sama sah sebagai GRU, tetapi menghasilkan
+Kesimpulan: ketiga rumus sama-sama sah sebagai GRU, tetapi menghasilkan
 angka yang berbeda untuk himpunan bobot yang sama. Karena bobot di sini
 dilatih oleh Keras, perhitungan manual WAJIB memakai konvensi Keras.
 ```
@@ -196,7 +199,19 @@ Prediksi hasil hitung tangan dengan NumPy sebesar `0.6476814983`
 `model.predict()` menghasilkan `0.6476814747` dengan selisih hanya
 2.37e-08 — jauh di bawah toleransi $10^{-5}$.
 
-Sebaliknya, memakai rumus buku teks Cho dkk. (2014) pada himpunan bobot yang
-sama menghasilkan `0.5364631926`, yaitu berbeda
-1.11e-01. Hal ini membuktikan pentingnya memakai
+Sebaliknya, pada himpunan bobot yang sama, rumus Cho dkk. (2014) (gerbang reset
+sebelum perkalian matriks) menghasilkan `0.6086797567` (berbeda
+3.90e-02), dan rumus Chung dkk. (2014) (peran
+$\mathbf{z}_t$ tertukar) menghasilkan `0.5364631926` (berbeda
+1.11e-01). Hal ini membuktikan pentingnya memakai
 konvensi Keras pada perhitungan manual skripsi.
+
+<!-- navigasi-perhitungan-manual -->
+
+---
+
+← Sebelumnya: [Tahap 8.10: Membaca Kurva Loss Model GRU](tahap_08_10_kurva_loss_gru.md)
+
+[Daftar isi perhitungan manual](README.md)
+
+→ Berikutnya: [Tahap 8.12: Bias pada GRU: Peran, Cara Menghitung, dan Dua Jenis Bias](tahap_08_12_bias_gru.md)

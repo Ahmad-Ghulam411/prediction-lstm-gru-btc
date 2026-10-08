@@ -1,4 +1,4 @@
-# Perhitungan Manual - Tahap 2: Rata-rata dan Standar Deviasi Close Price
+# Perhitungan Manual - Tahap 2.8: Rata-rata dan Standar Deviasi Close Price
 
 ## Rumus
 
@@ -50,3 +50,11 @@ Rata-rata Close Price hasil hitung tangan sebesar
 **73,217.85 USD** dan standar deviasinya
 **26,310.08 USD**, identik dengan keluaran `pandas`
 (`.mean()` dan `.std()`) sampai toleransi $10^{-5}$.
+
+<!-- navigasi-perhitungan-manual -->
+
+---
+
+[Daftar isi perhitungan manual](README.md)
+
+→ Berikutnya: [Tahap 5.4: Normalisasi Min-Max Close Price](tahap_05_04_normalisasi_min_max_close_price.md)

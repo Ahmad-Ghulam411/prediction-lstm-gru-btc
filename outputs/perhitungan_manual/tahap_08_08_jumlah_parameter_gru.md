@@ -1,4 +1,4 @@
-# Perhitungan Manual - Tahap 8: Jumlah Parameter Model GRU
+# Perhitungan Manual - Tahap 8.8: Jumlah Parameter Model GRU
 
 ## Rumus
 
@@ -62,3 +62,13 @@ Model GRU terbaik (30 neuron) memiliki
 31 parameter pada lapisan Dense, totalnya
 **3,811 parameter** — sama dengan keluaran
 `model.summary()`.
+
+<!-- navigasi-perhitungan-manual -->
+
+---
+
+← Sebelumnya: [Tahap 8.4: Simulasi Pelatihan GRU, Langkah 4: Update Adam](tahap_08_04_simulasi_update_adam_gru.md)
+
+[Daftar isi perhitungan manual](README.md)
+
+→ Berikutnya: [Tahap 8.10: Membaca Kurva Loss Model GRU](tahap_08_10_kurva_loss_gru.md)

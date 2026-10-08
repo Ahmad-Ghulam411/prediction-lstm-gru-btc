@@ -1,4 +1,4 @@
-# Perhitungan Manual - Tahap 12: Uji Diebold-Mariano LSTM vs GRU
+# Perhitungan Manual - Tahap 12.1: Uji Diebold-Mariano LSTM vs GRU
 
 ## Hipotesis
 
@@ -96,3 +96,11 @@ LANGKAH 7 — Hitung p-value dua sisi (distribusi t, df = T - 1)
 | Keputusan | **Gagal tolak $H_0$** |
 
 Perbedaan akurasi LSTM dan GRU **tidak signifikan** pada taraf 5%, sehingga kedua model dapat dianggap memiliki akurasi yang setara. Dengan demikian GRU yang strukturnya lebih sederhana mampu menyamai LSTM.
+
+<!-- navigasi-perhitungan-manual -->
+
+---
+
+← Sebelumnya: [Tahap 11.1: Metrik Evaluasi (RMSE, MAE, MAPE, Akurasi Arah)](tahap_11_01_metrik_evaluasi.md)
+
+[Daftar isi perhitungan manual](README.md)

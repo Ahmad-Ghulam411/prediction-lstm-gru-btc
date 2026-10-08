@@ -1,4 +1,4 @@
-# Perhitungan Manual - Tahap 7: Jumlah Parameter Model LSTM
+# Perhitungan Manual - Tahap 7.8: Jumlah Parameter Model LSTM
 
 ## Rumus
 
@@ -59,3 +59,13 @@ Model LSTM terbaik (40 neuron) memiliki
 41 parameter pada lapisan Dense, sehingga totalnya
 **8,201 parameter** — sama dengan keluaran
 `model.summary()` dari Keras.
+
+<!-- navigasi-perhitungan-manual -->
+
+---
+
+← Sebelumnya: [Tahap 7.4: Simulasi Pelatihan LSTM, Langkah 4: Update Adam](tahap_07_04_simulasi_update_adam_lstm.md)
+
+[Daftar isi perhitungan manual](README.md)
+
+→ Berikutnya: [Tahap 7.10: Membaca Kurva Loss Model LSTM](tahap_07_10_kurva_loss_lstm.md)

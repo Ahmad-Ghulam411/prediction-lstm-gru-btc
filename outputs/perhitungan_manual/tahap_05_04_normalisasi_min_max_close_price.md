@@ -1,4 +1,4 @@
-# Perhitungan Manual - Tahap 5: Normalisasi Min-Max Close Price
+# Perhitungan Manual - Tahap 5.4: Normalisasi Min-Max Close Price
 
 ## Rumus
 
@@ -48,3 +48,13 @@ Harga penutupan 2023-07-01 sebesar 30,471.50 USD setara dengan
 nilai ternormalisasi **0.054063**, sama dengan keluaran
 `MinMaxScaler` sampai toleransi $10^{-5}$. Proses balik (denormalisasi)
 mengembalikan angka 30,471.50 USD, yaitu nilai aslinya.
+
+<!-- navigasi-perhitungan-manual -->
+
+---
+
+← Sebelumnya: [Tahap 2.8: Rata-rata dan Standar Deviasi Close Price](tahap_02_08_rata_rata_dan_standar_deviasi_close_price.md)
+
+[Daftar isi perhitungan manual](README.md)
+
+→ Berikutnya: [Tahap 6.2: Pembentukan Sliding Window](tahap_06_02_sliding_window.md)

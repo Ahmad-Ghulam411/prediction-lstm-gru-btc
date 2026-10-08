@@ -6,5 +6,5 @@ MAPE (%),2.1061,2.0476,GRU
 Kategori MAPE,Sangat baik (<10%),Sangat baik (<10%),—
 Akurasi Arah (%),49.1150,51.3274,GRU
 Jumlah parameter,"8,201","3,811",GRU
-Waktu latih total (detik),79.56,83.05,LSTM
-Waktu latih per epoch (detik),0.1591,0.1661,LSTM
+Waktu latih total (detik),143.72,150.39,LSTM
+Waktu latih per epoch (detik),0.2874,0.3008,LSTM
