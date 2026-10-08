@@ -181,7 +181,7 @@ rm data/dataset_bitcoin.csv
 | 4 | Pembagian data (sebelum normalisasi) | — |
 | 5 | Normalisasi Min-Max | $x' = (x - x_{min})/(x_{max} - x_{min})$ |
 | 6 | Pembentukan *sliding window* | susunan jendela pertama |
-| 7 | Model LSTM | alur sel (Gambar 1-6), simulasi satu siklus pelatihan (*forward pass*, loss, BPTT, Adam), jumlah parameter, kurva loss, *forward pass* model terlatih, bias |
+| 7 | Model LSTM | penjabaran sigmoid dan tanh (persamaan 11-13), alur sel (Gambar 1-6), simulasi satu siklus pelatihan (*forward pass*, loss, BPTT, Adam), jumlah parameter, kurva loss, *forward pass* model terlatih, bias |
 | 8 | Model GRU | alur sel (Gambar 7), simulasi satu siklus pelatihan, jumlah parameter, kurva loss, *forward pass* model terlatih, dua jenis bias |
 | 9 | Perbandingan arsitektur dan kestabilan | perbandingan struktur LSTM dan GRU, reproduksibilitas *seed* |
 | 10 | Denormalisasi | $x = x'(x_{max} - x_{min}) + x_{min}$ |

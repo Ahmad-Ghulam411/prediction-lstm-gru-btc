@@ -51,6 +51,8 @@ $$\tanh'(a) = 4\,\sigma(2a)\bigl(1-\sigma(2a)\bigr)
 = 4\cdot\frac{1+\tanh(a)}{2}\cdot\frac{1-\tanh(a)}{2}
 = 1-\tanh^2(a)$$
 
+Persamaan (13) sendiri dijabarkan langkah demi langkah di [Tahap 7.1, bagian 3](tahap_07_01_alur_sel_lstm.md#3-sigmoid-dan-tanh-penjabaran-persamaan-11-13).
+
 ## 2. Backward di Lapisan Dense
 
 Backward berjalan dari kanan ke kiri, mulai dari loss. Rantainya:

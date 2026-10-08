@@ -65,6 +65,8 @@ Perhitungan lengkap kedua time step ada di [Tahap 8.2 (Simulasi Pelatihan GRU, L
 
 Seperti pada LSTM, σ (0 sampai 1) berperan sebagai **keran** dan tanh (-1 sampai 1)
 sebagai **isi informasi**; penjelasan lengkapnya di [Tahap 7.1, bagian 2](tahap_07_01_alur_sel_lstm.md#2-cara-membaca-gambar).
+Rumus kedua fungsi itu dan penjabaran hubungannya, tanh(z) = 2σ(2z) − 1 (persamaan 11-13),
+ada di [Tahap 7.1, bagian 3](tahap_07_01_alur_sel_lstm.md#3-sigmoid-dan-tanh-penjabaran-persamaan-11-13).
 GRU **hanya punya satu garis memori**, yaitu hₜ. Tidak ada cₜ terpisah dan tidak ada
 output gate.
 

@@ -2,21 +2,24 @@
 
 Subbagian ini menjelaskan alur **Gambar 1 sampai Gambar 6** pada subbab 1.5.8
 langkah demi langkah: apa yang mengalir di setiap garis, apa yang dikerjakan setiap
-kotak, dan apa fungsinya. Setiap gerbang diberi contoh angka dari model mini pada
-**time step t = 2**, karena di sana memori dari t = 1 sudah ikut bekerja.
+kotak, dan apa fungsinya. Sebelumnya, bagian 3 menjabarkan fungsi aktivasi sigmoid
+dan tanh beserta hubungan keduanya (persamaan 11-13). Setiap gerbang diberi contoh
+angka dari model mini pada **time step t = 2**, karena di sana memori dari t = 1
+sudah ikut bekerja.
 
 **Daftar isi**
 
 - [1. Model Mini yang Dipakai](#1-model-mini-yang-dipakai)
 - [2. Cara Membaca Gambar](#2-cara-membaca-gambar)
-- [3. Gambar 1: Struktur LSTM](#3-gambar-1-struktur-lstm)
-- [4. Gambar 2: Cell State](#4-gambar-2-cell-state)
-- [5. Gambar 3: Forget Gate](#5-gambar-3-forget-gate)
-- [6. Gambar 4: Input Gate](#6-gambar-4-input-gate)
-- [7. Gambar 5: Pembaruan Cell State](#7-gambar-5-pembaruan-cell-state)
-- [8. Gambar 6: Output Gate](#8-gambar-6-output-gate)
-- [9. Ringkasan Satu Langkah LSTM](#9-ringkasan-satu-langkah-lstm)
-- [10. Catatan untuk Naskah Skripsi](#10-catatan-untuk-naskah-skripsi)
+- [3. Sigmoid dan Tanh: Penjabaran Persamaan (11)-(13)](#3-sigmoid-dan-tanh-penjabaran-persamaan-11-13)
+- [4. Gambar 1: Struktur LSTM](#4-gambar-1-struktur-lstm)
+- [5. Gambar 2: Cell State](#5-gambar-2-cell-state)
+- [6. Gambar 3: Forget Gate](#6-gambar-3-forget-gate)
+- [7. Gambar 4: Input Gate](#7-gambar-4-input-gate)
+- [8. Gambar 5: Pembaruan Cell State](#8-gambar-5-pembaruan-cell-state)
+- [9. Gambar 6: Output Gate](#9-gambar-6-output-gate)
+- [10. Ringkasan Satu Langkah LSTM](#10-ringkasan-satu-langkah-lstm)
+- [11. Catatan untuk Naskah Skripsi](#11-catatan-untuk-naskah-skripsi)
 
 **Cara membaca angka.** Angka memakai titik sebagai pemisah desimal dan koma
 sebagai pemisah ribuan, sama seperti berkas perhitungan manual lainnya. Angka
@@ -77,7 +80,190 @@ Gambar 1-6 berasal dari Olah (2015). Simbolnya:
   atau negatif sehingga memori bisa dinaikkan atau diturunkan, dan tetap terbatas
   sehingga tidak meledak.
 
-## 3. Gambar 1: Struktur LSTM
+## 3. Sigmoid dan Tanh: Penjabaran Persamaan (11)-(13)
+
+Kotak kuning σ dan tanh pada Gambar 1-6 memakai dua fungsi aktivasi, yaitu
+persamaan (11) dan (12). Persamaan (13) menghubungkan keduanya. Bagian ini
+menunjukkan cara **memperoleh persamaan (13) sendiri** dari (11) dan (12), seolah-olah
+kita belum pernah melihatnya.
+
+**Penting:** persamaan (12) **bukan** hasil olahan persamaan (11). Keduanya definisi
+yang berdiri sendiri. Persamaan (13) adalah **jembatan** yang membuktikan bahwa tanh
+sebenarnya sigmoid yang dipercuram, direntangkan, lalu digeser.
+
+### 3.1 Sigmoid, Persamaan (11)
+
+$$\sigma(z) = \frac{1}{1+e^{-z}}$$
+
+Perilakunya ditentukan oleh e^(−z):
+
+| z | e^(−z) | σ(z) = 1 / (1 + e^(−z)) | Keterangan |
+|---|---|---|---|
+| 10 | 0.000045 | 0.999955 | z besar → e^(−z) ≈ 0 → σ ≈ 1 |
+| 2 | 0.135335 | 0.880797 |  |
+| 0 | 1.000000 | 0.500000 | tepat di tengah |
+| -2 | 7.389056 | 0.119203 |  |
+| -10 | 22026.465795 | 0.000045 | z sangat negatif → e^(−z) sangat besar → σ ≈ 0 |
+
+Berapa pun nilai z, hasil sigmoid selalu di antara **0 dan 1**, dan σ(0) = 0.5.
+
+### 3.2 Tanh, Persamaan (12)
+
+$$\tanh(z) = \frac{e^{z}-e^{-z}}{e^{z}+e^{-z}}$$
+
+| z | e^z | e^(−z) | tanh(z) |
+|---|---|---|---|
+| 10 | 22026.465795 | 0.000045 | 1.000000 |
+| 2 | 7.389056 | 0.135335 | 0.964028 |
+| 0 | 1.000000 | 1.000000 | 0.000000 |
+| -2 | 0.135335 | 7.389056 | -0.964028 |
+| -10 | 0.000045 | 22026.465795 | -1.000000 |
+
+Hasil tanh selalu di antara **−1 dan 1**, tanh(0) = 0, dan simetris: tanh(−z) = −tanh(z).
+Bentuk kurvanya sama-sama huruf S seperti sigmoid; yang berbeda hanya rentangnya.
+
+### 3.3 Cara 1: Mulai dari Tanh, Cari Bentuk Sigmoid
+
+Ciri khas sigmoid adalah pola **1 / (1 + e^(−sesuatu))**. Tugasnya: ubah rumus tanh
+sedikit demi sedikit sampai pola itu muncul di dalamnya.
+
+**Langkah 1 — tulis rumus tanh (12).**
+
+$$\tanh(z) = \frac{e^{z}-e^{-z}}{e^{z}+e^{-z}}$$
+
+**Langkah 2 — buat penyebut diawali angka 1.** Penyebut sigmoid berbentuk "1 + …",
+sedangkan penyebut tanh diawali e^z. Karena itu **pembilang dan penyebut dibagi e^z**.
+Ini boleh, karena membagi atas dan bawah pecahan dengan bilangan yang sama tidak
+mengubah nilainya, dan e^z tidak pernah 0. Aturan yang dipakai: e^p / e^q = e^(p−q),
+sehingga e^z / e^z = e^0 = 1 dan e^(−z) / e^z = e^(−z−z) = e^(−2z).
+
+$$\tanh(z) = \frac{\dfrac{e^{z}}{e^{z}} - \dfrac{e^{-z}}{e^{z}}}{\dfrac{e^{z}}{e^{z}} + \dfrac{e^{-z}}{e^{z}}} = \frac{1-e^{-2z}}{1+e^{-2z}}$$
+
+**Langkah 3 — kenali pola sigmoid.** Penyebut 1 + e^(−2z) persis sama dengan penyebut
+sigmoid (11), asalkan z di sigmoid diganti **2z**. Jadi yang akan muncul adalah σ(2z),
+bukan σ(z). **Inilah asal angka 2 di dalam kurung** pada persamaan (13).
+
+$$\sigma(2z) = \frac{1}{1+e^{-2z}}$$
+
+Agar ringkas, misalkan **u = e^(−2z)**, sehingga:
+
+$$\tanh(z) = \frac{1-u}{1+u}, \qquad \sigma(2z) = \frac{1}{1+u}$$
+
+**Langkah 4 — munculkan (1 + u) di pembilang.** Pembilang tanh adalah 1 − u, sedangkan
+pembilang sigmoid adalah 1. Agar bisa dicoret dengan penyebut, (1 + u) harus muncul di
+pembilang. Caranya dengan **trik tambah-kurang**: tulis 1 sebagai 2 − 1, sehingga
+1 − u = 2 − 1 − u = 2 − (1 + u).
+
+$$\tanh(z) = \frac{2-(1+u)}{1+u}$$
+
+**Langkah 5 — pecah menjadi dua pecahan** (penyebutnya sama), lalu coret (1 + u)/(1 + u) = 1.
+
+$$\tanh(z) = \frac{2}{1+u} - \frac{1+u}{1+u} = 2\cdot\frac{1}{1+u} - 1$$
+
+**Langkah 6 — ganti 1/(1 + u) dengan σ(2z)** dari Langkah 3. Persamaan (13) muncul:
+
+$$\tanh(z) = 2\sigma(2z) - 1 \qquad (13)$$
+
+| Langkah | Yang dilakukan | Alasannya |
+|---|---|---|
+| 1 | Tulis tanh (12) | titik awal |
+| 2 | Bagi pembilang dan penyebut dengan e^z | agar penyebut diawali 1, seperti sigmoid |
+| 3 | Kenali 1 + e^(−2z) | itu penyebut σ(2z); asal angka 2 |
+| 4 | 1 − u = 2 − (1 + u) | agar (1 + u) muncul di pembilang |
+| 5 | Pecah pecahan | (1 + u)/(1 + u) = 1 |
+| 6 | Ganti 1/(1 + u) dengan σ(2z) | hasil akhir: persamaan (13) |
+
+### 3.4 Cara 2: Mulai dari Sigmoid, Cari Bentuk Tanh
+
+Arahnya dibalik. Pangkat pada tanh berpasangan (+z dan −z), jadi sigmoid dibuat
+berpasangan juga.
+
+**Langkah 1 — kalikan pembilang dan penyebut sigmoid dengan e^(z/2).** Penyebutnya
+menjadi e^(z/2) + e^(−z) · e^(z/2) = e^(z/2) + e^(−z/2), yang pangkatnya berpasangan
+seperti tanh.
+
+$$\sigma(z) = \frac{1}{1+e^{-z}} = \frac{e^{z/2}}{e^{z/2}+e^{-z/2}}$$
+
+**Langkah 2 — ubah pembilang menjadi selisih.** Pembilang tanh berupa selisih, sedangkan
+pembilang di atas hanya satu suku. Rentang nilainya memberi petunjuk: sigmoid bernilai
+0 sampai 1, tanh −1 sampai 1. Untuk memindahkan 0..1 ke −1..1, **kalikan 2** (menjadi
+0..2) lalu **kurangi 1** (menjadi −1..1). Jadi hitung 2σ(z) − 1:
+
+$$2\sigma(z) - 1 = \frac{2e^{z/2} - \left(e^{z/2}+e^{-z/2}\right)}{e^{z/2}+e^{-z/2}} = \frac{e^{z/2}-e^{-z/2}}{e^{z/2}+e^{-z/2}} = \tanh\left(\frac{z}{2}\right)$$
+
+**Langkah 3 — ganti z dengan 2z** di kedua ruas. Hasilnya sama dengan Cara 1:
+
+$$2\sigma(2z) - 1 = \tanh(z)$$
+
+### 3.5 Cara 3: Tebak dari Bentuk Grafik, Lalu Buktikan
+
+Cara ini kira-kira yang dilakukan seseorang yang belum tahu rumusnya.
+
+```
+1. Samakan rentang. Sigmoid 0..1, tanh −1..1 → tebakan pertama: 2σ(z) − 1.
+
+2. Uji dengan angka, z = 0.5:
+     2σ(0.5) − 1 = 2 × 0.622459 − 1 = 0.244919
+     tanh(0.5)   = 0.462117          → tidak sama!
+
+3. Cari penyebabnya lewat kemiringan (turunan) di z = 0:
+     kemiringan σ(z)        = σ(0)(1 − σ(0)) = 0.5 × 0.5 = 0.25
+     kemiringan 2σ(z) − 1   = 2 × 0.25 = 0.50
+     kemiringan tanh(z)     = 1 − tanh²(0) = 1.00
+   Tebakan pertama 2 kali kurang curam → ganti z dengan 2z.
+
+4. Tebakan kedua: 2σ(2z) − 1
+     2σ(1) − 1 = 2 × 0.731059 − 1 = 0.462117 = tanh(0.5) ✓
+
+5. Tebakan yang cocok ini lalu dibuktikan secara aljabar dengan Cara 1.
+```
+
+### 3.6 Arti Persamaan (13)
+
+Persamaan (13) mengubah sigmoid menjadi tanh dengan tiga operasi:
+
+| Operasi | Bentuk | Rentang | Nilai di z = 0 | Kemiringan di z = 0 |
+|---|---|---|---|---|
+| mulai dari sigmoid | σ(z) | 0 sampai 1 | 0.5 | 0.25 |
+| ① ganti z dengan 2z | σ(2z) | 0 sampai 1, 2 kali lebih curam | 0.5 | 0.50 |
+| ② kalikan 2 | 2σ(2z) | 0 sampai 2 | 1.0 | 1.00 |
+| ③ kurangi 1 | 2σ(2z) − 1 | **−1 sampai 1** | **0.0** = tanh(0) | **1.00** = kemiringan tanh |
+
+Singkatnya, tanh adalah sigmoid yang **dibuat 2 kali lebih curam, direntangkan 2 kali ke
+atas, lalu digeser turun 1**.
+
+### 3.7 Cek dengan Angka Model Mini
+
+Kandidat c̃₂ pada Gambar 4 (bagian 7) memakai tanh dengan pra-aktivasi a = 0.440988.
+Ketiga bentuk rumus memberi hasil yang sama:
+
+```
+Lewat persamaan (12):
+  e^a = e^0.440988 = 1.554242      e^(−a) = 0.643400
+  tanh(a) = (1.554242 − 0.643400) / (1.554242 + 0.643400) = 0.910842 / 2.197643 = 0.414463
+
+Lewat hasil Langkah 2 (Cara 1):
+  u = e^(−2a) = e^(−0.881976) = 0.413964
+  (1 − u) / (1 + u) = 0.586036 / 1.413964 = 0.414463
+
+Lewat persamaan (13):
+  σ(2a) = σ(0.881976) = 1 / (1 + 0.413964) = 0.707232
+  2σ(2a) − 1 = 2 × 0.707232 − 1 = 0.414463
+
+Ketiganya = c̃₂ = 0.414463 ✓
+```
+
+### 3.8 Kaitan dengan Turunan pada BPTT
+
+Persamaan (13) juga menghubungkan turunan kedua fungsi. Dengan s = σ(2z):
+
+1 − tanh²(z) = 1 − (2s − 1)² = 1 − (4s² − 4s + 1) = 4s(1 − s)
+
+Jadi turunan tanh pun bisa dihitung dari sigmoid, dan keduanya cukup memakai nilai
+keluarannya sendiri: σ′ = σ(1 − σ) dan tanh′ = 1 − tanh². Kedua rumus turunan ini
+dipakai di setiap langkah backward pada [Tahap 7.3, bagian 1](tahap_07_03_simulasi_bptt_lstm.md#1-rumus-turunan-dasar).
+
+## 4. Gambar 1: Struktur LSTM
 
 **Alurnya:**
 
@@ -102,7 +288,7 @@ dikeluarkan.
 Hanya hidden state **langkah terakhir h_T** yang diteruskan ke lapisan dense
 (persamaan 21). Model mini dijalankan 2 kali (t = 1 dan t = 2), lalu h₂ masuk ke dense.
 
-## 4. Gambar 2: Cell State
+## 5. Gambar 2: Cell State
 
 **Alurnya:**
 
@@ -121,7 +307,7 @@ untuk mengingat (fₜ mendekati 1), gradien hampir tidak mengecil. Buktinya ada 
 [Tahap 7.3 (Simulasi Pelatihan LSTM, Langkah 3: Backpropagation Through Time)](tahap_07_03_simulasi_bptt_lstm.md): **86.4%** sinyal kesalahan yang
 sampai ke c₁ datang lewat jalur cell state ini.
 
-## 5. Gambar 3: Forget Gate
+## 6. Gambar 3: Forget Gate
 
 **Alurnya:**
 
@@ -147,7 +333,7 @@ Bias forget bernilai 1 (*unit forget bias* Keras). Karena itu, walaupun xₜ dan
 bernilai nol, gerbang ini tetap bernilai σ(1) = 0.731: secara bawaan model
 cenderung **mengingat**. Peran bias dijelaskan lengkap di [Tahap 7.12 (Bias pada LSTM: Peran dan Cara Menghitungnya)](tahap_07_12_bias_lstm.md).
 
-## 6. Gambar 4: Input Gate
+## 7. Gambar 4: Input Gate
 
 Gambar ini memiliki **dua cabang paralel** dari masukan yang sama (hₜ₋₁ dan xₜ).
 
@@ -172,7 +358,7 @@ Contoh angka (t = 2):
   Artinya usulan isi 0.414463 hanya masuk 59.7%.
 ```
 
-## 7. Gambar 5: Pembaruan Cell State
+## 8. Gambar 5: Pembaruan Cell State
 
 Gambar ini menggabungkan hasil Gambar 3 dan Gambar 4 di garis atas (persamaan 18):
 
@@ -192,7 +378,7 @@ Contoh angka (t = 2), memakai hasil Gambar 3 dan Gambar 4:
   Memori berubah dari c₁ = 0.193228 menjadi c₂ = 0.400479.
 ```
 
-## 8. Gambar 6: Output Gate
+## 9. Gambar 6: Output Gate
 
 **Alurnya:**
 
@@ -218,7 +404,7 @@ Contoh angka (t = 2):
   ŷ' = W_y × h₂ + b_y = 0.8 × 0.217794 + 0 = 0.174235
 ```
 
-## 9. Ringkasan Satu Langkah LSTM
+## 10. Ringkasan Satu Langkah LSTM
 
 Seluruh alur satu time step LSTM (t = 2, memori masuk c₁ = 0.193228 dan h₁ = 0.104941):
 
@@ -234,7 +420,33 @@ Prediksi ŷ′ = 0.174235 masih jauh dari target 0.7. Seberapa salah prediksi
 ini dan bagaimana bobot diperbaiki dihitung pada langkah berikutnya, mulai dari
 [Tahap 7.2 (Simulasi Pelatihan LSTM, Langkah 1-2: Forward Pass dan Loss)](tahap_07_02_simulasi_forward_pass_dan_loss_lstm.md).
 
-## 10. Catatan untuk Naskah Skripsi
+## 11. Catatan untuk Naskah Skripsi
+
+**Persamaan (11)-(13).**
+
+1. Kalimat "Jika fungsi tanh dihubungkan dengan fungsi sigmoid…" sudah tepat, karena
+   persamaan (13) memang **hubungan** kedua fungsi, bukan hasil olahan (11) menjadi (12).
+2. Bagian *Keterangan* belum menjelaskan tanh(z), padahal simbol ini muncul di persamaan
+   (12) dan (13). Sebaiknya ditambahkan:
+   `tanh(z) = Fungsi aktivasi tangen hiperbolik`.
+3. Jika penjabaran persamaan (13) ingin dicantumkan, versi ringkas Cara 1 (bagian 3.3)
+   cukup ditulis dalam beberapa baris:
+
+$$\tanh(z) = \frac{e^{z}-e^{-z}}{e^{z}+e^{-z}}$$
+
+$$= \frac{1-e^{-2z}}{1+e^{-2z}} \qquad \text{(pembilang dan penyebut dibagi } e^{z}\text{)}$$
+
+$$= \frac{2-\left(1+e^{-2z}\right)}{1+e^{-2z}}$$
+
+$$= 2\cdot\frac{1}{1+e^{-2z}} - 1$$
+
+$$= 2\sigma(2z) - 1 \qquad \text{(karena } \sigma(2z) = \tfrac{1}{1+e^{-2z}}\text{)}$$
+
+Contoh kalimat pengantarnya:
+
+> Dengan membagi pembilang dan penyebut persamaan (12) dengan e^z, penyebutnya berbentuk
+> sama dengan penyebut fungsi sigmoid pada persamaan (11) untuk masukan 2z, sehingga
+> diperoleh persamaan (13).
 
 **Notasi Cₜ pada Gambar 1-6.** Gambar Olah (2015) memakai huruf besar Cₜ untuk cell
 state, sedangkan persamaan skripsi memakai cₜ. Satu kalimat penjelas dapat mencegah

@@ -1528,7 +1528,7 @@ Keras pada 7.A.
 
 | Subbagian | Isi |
 |---|---|
-| 7.1 | Alur sel LSTM (Gambar 1-6) dengan contoh angka |
+| 7.1 | Sigmoid dan tanh beserta penjabaran hubungannya (persamaan 11-13), lalu alur sel LSTM (Gambar 1-6) dengan contoh angka |
 | 7.2 | Langkah 1-2: *forward pass* dan loss MSE |
 | 7.3 | Langkah 3: *backpropagation through time* (gradien setiap bobot dan bias) |
 | 7.4 | Langkah 4: update Adam, lalu siklus diulang 500 kali |
@@ -1539,7 +1539,7 @@ manual disimpan sebagai `outputs/perhitungan_manual/tahap_07_SS_*.md`.
 ''')
 
 kode(r'''
-utils.cetak_sub("7.1 PERHITUNGAN MANUAL — alur sel LSTM (Gambar 1-6) dengan model mini")
+utils.cetak_sub("7.1 PERHITUNGAN MANUAL — sigmoid dan tanh (persamaan 11-13), alur sel LSTM (Gambar 1-6)")
 
 # Konteks penelitian dan model mini dipakai bersama oleh Tahap 7, 8, dan 9
 konteks_pelatihan = manual_pelatihan.konteks_penelitian(

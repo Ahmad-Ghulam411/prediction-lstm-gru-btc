@@ -506,19 +506,202 @@ def alur_sel(sim: Simulasi, kt: dict) -> str:
     return _alur_sel_lstm(sim, kt) if sim.model == "LSTM" else _alur_sel_gru(sim, kt)
 
 
+JUDUL_SIGMOID_TANH = "3. Sigmoid dan Tanh: Penjabaran Persamaan (11)-(13)"
+
+
+def _sigmoid_tanh(d, s2):
+    """Penjabaran persamaan (11)-(13) dari sigmoid dan tanh, dicek dengan angka."""
+    def turunan_sig(z):
+        return sig(z) * (1 - sig(z))
+
+    d.teks("""
+Kotak kuning σ dan tanh pada Gambar 1-6 memakai dua fungsi aktivasi, yaitu
+persamaan (11) dan (12). Persamaan (13) menghubungkan keduanya. Bagian ini
+menunjukkan cara **memperoleh persamaan (13) sendiri** dari (11) dan (12), seolah-olah
+kita belum pernah melihatnya.
+
+**Penting:** persamaan (12) **bukan** hasil olahan persamaan (11). Keduanya definisi
+yang berdiri sendiri. Persamaan (13) adalah **jembatan** yang membuktikan bahwa tanh
+sebenarnya sigmoid yang dipercuram, direntangkan, lalu digeser.
+""")
+
+    d.teks("### 3.1 Sigmoid, Persamaan (11)")
+    d.teks(r"$$\sigma(z) = \frac{1}{1+e^{-z}}$$")
+    d.teks("Perilakunya ditentukan oleh e^(−z):")
+    d.tabel(["z", "e^(−z)", "σ(z) = 1 / (1 + e^(−z))", "Keterangan"],
+            [[str(z), a(math.exp(-z)), a(sig(z)), ket]
+             for z, ket in [(10, "z besar → e^(−z) ≈ 0 → σ ≈ 1"), (2, ""), (0, "tepat di tengah"),
+                            (-2, ""), (-10, "z sangat negatif → e^(−z) sangat besar → σ ≈ 0")]])
+    d.teks("Berapa pun nilai z, hasil sigmoid selalu di antara **0 dan 1**, dan σ(0) = 0.5.")
+
+    d.teks("### 3.2 Tanh, Persamaan (12)")
+    d.teks(r"$$\tanh(z) = \frac{e^{z}-e^{-z}}{e^{z}+e^{-z}}$$")
+    d.tabel(["z", "e^z", "e^(−z)", "tanh(z)"],
+            [[str(z), a(math.exp(z)), a(math.exp(-z)), a(math.tanh(z))] for z in (10, 2, 0, -2, -10)])
+    d.teks("""
+Hasil tanh selalu di antara **−1 dan 1**, tanh(0) = 0, dan simetris: tanh(−z) = −tanh(z).
+Bentuk kurvanya sama-sama huruf S seperti sigmoid; yang berbeda hanya rentangnya.
+""")
+
+    d.teks("### 3.3 Cara 1: Mulai dari Tanh, Cari Bentuk Sigmoid")
+    d.teks("""
+Ciri khas sigmoid adalah pola **1 / (1 + e^(−sesuatu))**. Tugasnya: ubah rumus tanh
+sedikit demi sedikit sampai pola itu muncul di dalamnya.
+
+**Langkah 1 — tulis rumus tanh (12).**
+""")
+    d.teks(r"$$\tanh(z) = \frac{e^{z}-e^{-z}}{e^{z}+e^{-z}}$$")
+    d.teks("""
+**Langkah 2 — buat penyebut diawali angka 1.** Penyebut sigmoid berbentuk "1 + …",
+sedangkan penyebut tanh diawali e^z. Karena itu **pembilang dan penyebut dibagi e^z**.
+Ini boleh, karena membagi atas dan bawah pecahan dengan bilangan yang sama tidak
+mengubah nilainya, dan e^z tidak pernah 0. Aturan yang dipakai: e^p / e^q = e^(p−q),
+sehingga e^z / e^z = e^0 = 1 dan e^(−z) / e^z = e^(−z−z) = e^(−2z).
+""")
+    d.teks(r"$$\tanh(z) = \frac{\dfrac{e^{z}}{e^{z}} - \dfrac{e^{-z}}{e^{z}}}"
+           r"{\dfrac{e^{z}}{e^{z}} + \dfrac{e^{-z}}{e^{z}}} = \frac{1-e^{-2z}}{1+e^{-2z}}$$")
+    d.teks("""
+**Langkah 3 — kenali pola sigmoid.** Penyebut 1 + e^(−2z) persis sama dengan penyebut
+sigmoid (11), asalkan z di sigmoid diganti **2z**. Jadi yang akan muncul adalah σ(2z),
+bukan σ(z). **Inilah asal angka 2 di dalam kurung** pada persamaan (13).
+""")
+    d.teks(r"$$\sigma(2z) = \frac{1}{1+e^{-2z}}$$")
+    d.teks("Agar ringkas, misalkan **u = e^(−2z)**, sehingga:")
+    d.teks(r"$$\tanh(z) = \frac{1-u}{1+u}, \qquad \sigma(2z) = \frac{1}{1+u}$$")
+    d.teks("""
+**Langkah 4 — munculkan (1 + u) di pembilang.** Pembilang tanh adalah 1 − u, sedangkan
+pembilang sigmoid adalah 1. Agar bisa dicoret dengan penyebut, (1 + u) harus muncul di
+pembilang. Caranya dengan **trik tambah-kurang**: tulis 1 sebagai 2 − 1, sehingga
+1 − u = 2 − 1 − u = 2 − (1 + u).
+""")
+    d.teks(r"$$\tanh(z) = \frac{2-(1+u)}{1+u}$$")
+    d.teks("**Langkah 5 — pecah menjadi dua pecahan** (penyebutnya sama), lalu coret (1 + u)/(1 + u) = 1.")
+    d.teks(r"$$\tanh(z) = \frac{2}{1+u} - \frac{1+u}{1+u} = 2\cdot\frac{1}{1+u} - 1$$")
+    d.teks("**Langkah 6 — ganti 1/(1 + u) dengan σ(2z)** dari Langkah 3. Persamaan (13) muncul:")
+    d.teks(r"$$\tanh(z) = 2\sigma(2z) - 1 \qquad (13)$$")
+    d.tabel(["Langkah", "Yang dilakukan", "Alasannya"],
+            [["1", "Tulis tanh (12)", "titik awal"],
+             ["2", "Bagi pembilang dan penyebut dengan e^z", "agar penyebut diawali 1, seperti sigmoid"],
+             ["3", "Kenali 1 + e^(−2z)", "itu penyebut σ(2z); asal angka 2"],
+             ["4", "1 − u = 2 − (1 + u)", "agar (1 + u) muncul di pembilang"],
+             ["5", "Pecah pecahan", "(1 + u)/(1 + u) = 1"],
+             ["6", "Ganti 1/(1 + u) dengan σ(2z)", "hasil akhir: persamaan (13)"]])
+
+    d.teks("### 3.4 Cara 2: Mulai dari Sigmoid, Cari Bentuk Tanh")
+    d.teks("""
+Arahnya dibalik. Pangkat pada tanh berpasangan (+z dan −z), jadi sigmoid dibuat
+berpasangan juga.
+
+**Langkah 1 — kalikan pembilang dan penyebut sigmoid dengan e^(z/2).** Penyebutnya
+menjadi e^(z/2) + e^(−z) · e^(z/2) = e^(z/2) + e^(−z/2), yang pangkatnya berpasangan
+seperti tanh.
+""")
+    d.teks(r"$$\sigma(z) = \frac{1}{1+e^{-z}} = \frac{e^{z/2}}{e^{z/2}+e^{-z/2}}$$")
+    d.teks("""
+**Langkah 2 — ubah pembilang menjadi selisih.** Pembilang tanh berupa selisih, sedangkan
+pembilang di atas hanya satu suku. Rentang nilainya memberi petunjuk: sigmoid bernilai
+0 sampai 1, tanh −1 sampai 1. Untuk memindahkan 0..1 ke −1..1, **kalikan 2** (menjadi
+0..2) lalu **kurangi 1** (menjadi −1..1). Jadi hitung 2σ(z) − 1:
+""")
+    d.teks(r"$$2\sigma(z) - 1 = \frac{2e^{z/2} - \left(e^{z/2}+e^{-z/2}\right)}{e^{z/2}+e^{-z/2}}"
+           r" = \frac{e^{z/2}-e^{-z/2}}{e^{z/2}+e^{-z/2}} = \tanh\left(\frac{z}{2}\right)$$")
+    d.teks("**Langkah 3 — ganti z dengan 2z** di kedua ruas. Hasilnya sama dengan Cara 1:")
+    d.teks(r"$$2\sigma(2z) - 1 = \tanh(z)$$")
+
+    d.teks("### 3.5 Cara 3: Tebak dari Bentuk Grafik, Lalu Buktikan")
+    z = 0.5
+    tebak_1, tebak_2 = 2 * sig(z) - 1, 2 * sig(2 * z) - 1
+    assert abs(tebak_1 - math.tanh(z)) > 0.1 and abs(tebak_2 - math.tanh(z)) < 1e-12
+    d.teks("Cara ini kira-kira yang dilakukan seseorang yang belum tahu rumusnya.")
+    d.kode([
+        "1. Samakan rentang. Sigmoid 0..1, tanh −1..1 → tebakan pertama: 2σ(z) − 1.",
+        "",
+        f"2. Uji dengan angka, z = {z}:",
+        f"     2σ({z}) − 1 = 2 × {a(sig(z))} − 1 = {a(tebak_1)}",
+        f"     tanh({z})   = {a(math.tanh(z))}          → tidak sama!",
+        "",
+        "3. Cari penyebabnya lewat kemiringan (turunan) di z = 0:",
+        f"     kemiringan σ(z)        = σ(0)(1 − σ(0)) = 0.5 × 0.5 = {a(turunan_sig(0), 2)}",
+        f"     kemiringan 2σ(z) − 1   = 2 × {a(turunan_sig(0), 2)} = {a(2 * turunan_sig(0), 2)}",
+        f"     kemiringan tanh(z)     = 1 − tanh²(0) = {a(1 - math.tanh(0) ** 2, 2)}",
+        "   Tebakan pertama 2 kali kurang curam → ganti z dengan 2z.",
+        "",
+        "4. Tebakan kedua: 2σ(2z) − 1",
+        f"     2σ({2 * z:g}) − 1 = 2 × {a(sig(2 * z))} − 1 = {a(tebak_2)} = tanh({z}) ✓",
+        "",
+        "5. Tebakan yang cocok ini lalu dibuktikan secara aljabar dengan Cara 1.",
+    ])
+
+    d.teks("### 3.6 Arti Persamaan (13)")
+    d.teks("Persamaan (13) mengubah sigmoid menjadi tanh dengan tiga operasi:")
+    d.tabel(["Operasi", "Bentuk", "Rentang", "Nilai di z = 0", "Kemiringan di z = 0"],
+            [["mulai dari sigmoid", "σ(z)", "0 sampai 1", a(sig(0), 1), a(turunan_sig(0), 2)],
+             ["① ganti z dengan 2z", "σ(2z)", "0 sampai 1, 2 kali lebih curam", a(sig(0), 1),
+              a(2 * turunan_sig(0), 2)],
+             ["② kalikan 2", "2σ(2z)", "0 sampai 2", a(2 * sig(0), 1), a(4 * turunan_sig(0), 2)],
+             ["③ kurangi 1", "2σ(2z) − 1", "**−1 sampai 1**", f"**{a(2 * sig(0) - 1, 1)}** = tanh(0)",
+              f"**{a(4 * turunan_sig(0), 2)}** = kemiringan tanh"]])
+    d.teks("""
+Singkatnya, tanh adalah sigmoid yang **dibuat 2 kali lebih curam, direntangkan 2 kali ke
+atas, lalu digeser turun 1**.
+""")
+
+    d.teks("### 3.7 Cek dengan Angka Model Mini")
+    ac = s2["a_c"]
+    lewat_12 = (math.exp(ac) - math.exp(-ac)) / (math.exp(ac) + math.exp(-ac))
+    u = math.exp(-2 * ac)
+    lewat_langkah_2 = (1 - u) / (1 + u)
+    lewat_13 = 2 * sig(2 * ac) - 1
+    assert max(abs(lewat_12 - s2["cc"]), abs(lewat_langkah_2 - s2["cc"]), abs(lewat_13 - s2["cc"])) < 1e-12
+    d.teks(f"""
+Kandidat c̃₂ pada Gambar 4 (bagian 7) memakai tanh dengan pra-aktivasi a = {a(ac)}.
+Ketiga bentuk rumus memberi hasil yang sama:
+""")
+    d.kode([
+        "Lewat persamaan (12):",
+        f"  e^a = e^{a(ac)} = {a(math.exp(ac))}      e^(−a) = {a(math.exp(-ac))}",
+        f"  tanh(a) = ({a(math.exp(ac))} − {a(math.exp(-ac))}) / ({a(math.exp(ac))} + {a(math.exp(-ac))})"
+        f" = {a(math.exp(ac) - math.exp(-ac))} / {a(math.exp(ac) + math.exp(-ac))} = {a(lewat_12)}",
+        "",
+        "Lewat hasil Langkah 2 (Cara 1):",
+        f"  u = e^(−2a) = e^(−{a(2 * ac)}) = {a(u)}",
+        f"  (1 − u) / (1 + u) = {a(1 - u)} / {a(1 + u)} = {a(lewat_langkah_2)}",
+        "",
+        "Lewat persamaan (13):",
+        f"  σ(2a) = σ({a(2 * ac)}) = 1 / (1 + {a(u)}) = {a(sig(2 * ac))}",
+        f"  2σ(2a) − 1 = 2 × {a(sig(2 * ac))} − 1 = {a(lewat_13)}",
+        "",
+        f"Ketiganya = c̃₂ = {a(s2['cc'])} ✓",
+    ])
+
+    d.teks("### 3.8 Kaitan dengan Turunan pada BPTT")
+    d.teks(f"""
+Persamaan (13) juga menghubungkan turunan kedua fungsi. Dengan s = σ(2z):
+
+1 − tanh²(z) = 1 − (2s − 1)² = 1 − (4s² − 4s + 1) = 4s(1 − s)
+
+Jadi turunan tanh pun bisa dihitung dari sigmoid, dan keduanya cukup memakai nilai
+keluarannya sendiri: σ′ = σ(1 − σ) dan tanh′ = 1 − tanh². Kedua rumus turunan ini
+dipakai di setiap langkah backward pada {tautan('LSTM', 'bptt', '1. Rumus Turunan Dasar')}.
+""")
+
+
 def _alur_sel_lstm(sim, kt):
     p = sim.p0
     s1, s2 = sim.maju["langkah"]
-    J = {1: "1. Model Mini yang Dipakai", 2: "2. Cara Membaca Gambar", 3: "3. Gambar 1: Struktur LSTM",
-         4: "4. Gambar 2: Cell State", 5: "5. Gambar 3: Forget Gate", 6: "6. Gambar 4: Input Gate",
-         7: "7. Gambar 5: Pembaruan Cell State", 8: "8. Gambar 6: Output Gate",
-         9: "9. Ringkasan Satu Langkah LSTM", 10: "10. Catatan untuk Naskah Skripsi"}
+    J = {1: "1. Model Mini yang Dipakai", 2: "2. Cara Membaca Gambar", 3: JUDUL_SIGMOID_TANH,
+         4: "4. Gambar 1: Struktur LSTM", 5: "5. Gambar 2: Cell State", 6: "6. Gambar 3: Forget Gate",
+         7: "7. Gambar 4: Input Gate", 8: "8. Gambar 5: Pembaruan Cell State",
+         9: "9. Gambar 6: Output Gate", 10: "10. Ringkasan Satu Langkah LSTM",
+         11: "11. Catatan untuk Naskah Skripsi"}
     d = Dokumen()
     d.teks("""
 Subbagian ini menjelaskan alur **Gambar 1 sampai Gambar 6** pada subbab 1.5.8
 langkah demi langkah: apa yang mengalir di setiap garis, apa yang dikerjakan setiap
-kotak, dan apa fungsinya. Setiap gerbang diberi contoh angka dari model mini pada
-**time step t = 2**, karena di sana memori dari t = 1 sudah ikut bekerja.
+kotak, dan apa fungsinya. Sebelumnya, bagian 3 menjabarkan fungsi aktivasi sigmoid
+dan tanh beserta hubungan keduanya (persamaan 11-13). Setiap gerbang diberi contoh
+angka dari model mini pada **time step t = 2**, karena di sana memori dari t = 1
+sudah ikut bekerja.
 """)
     d.daftar_isi(J)
     d.teks(CATATAN_ANGKA)
@@ -555,6 +738,9 @@ c₁ = {a(s1['c'])}. Perhitungan lengkap kedua time step ada di {tautan('LSTM', 
 """)
 
     d.teks(f"## {J[3]}")
+    _sigmoid_tanh(d, s2)
+
+    d.teks(f"## {J[4]}")
     d.teks(f"""
 **Alurnya:**
 
@@ -580,7 +766,7 @@ Hanya hidden state **langkah terakhir h_T** yang diteruskan ke lapisan dense
 (persamaan 21). Model mini dijalankan 2 kali (t = 1 dan t = 2), lalu h₂ masuk ke dense.
 """)
 
-    d.teks(f"## {J[4]}")
+    d.teks(f"## {J[5]}")
     d.teks(f"""
 **Alurnya:**
 
@@ -600,7 +786,7 @@ untuk mengingat (fₜ mendekati 1), gradien hampir tidak mengecil. Buktinya ada 
 sampai ke c₁ datang lewat jalur cell state ini.
 """)
 
-    d.teks(f"## {J[5]}")
+    d.teks(f"## {J[6]}")
     d.teks("""
 **Alurnya:**
 
@@ -628,7 +814,7 @@ bernilai nol, gerbang ini tetap bernilai σ(1) = {a(sig(1.0), 3)}: secara bawaan
 cenderung **mengingat**. Peran bias dijelaskan lengkap di {tautan('LSTM', 'bias')}.
 """)
 
-    d.teks(f"## {J[6]}")
+    d.teks(f"## {J[7]}")
     d.teks("""
 Gambar ini memiliki **dua cabang paralel** dari masukan yang sama (hₜ₋₁ dan xₜ).
 
@@ -655,7 +841,7 @@ bisa negatif, informasi baru bisa menaikkan atau menurunkan memori.
         f"  Artinya usulan isi {a(s2['cc'])} hanya masuk {persen(s2['i'])}.",
     ])
 
-    d.teks(f"## {J[7]}")
+    d.teks(f"## {J[8]}")
     d.teks("""
 Gambar ini menggabungkan hasil Gambar 3 dan Gambar 4 di garis atas (persamaan 18):
 
@@ -675,7 +861,7 @@ banyak memori baru. Ini salah satu pembeda utama dengan GRU (lihat Tahap 9.2).
         f"  Memori berubah dari c₁ = {a(s2['c_prev'])} menjadi c₂ = {a(s2['c'])}.",
     ])
 
-    d.teks(f"## {J[8]}")
+    d.teks(f"## {J[9]}")
     d.teks("""
 **Alurnya:**
 
@@ -702,7 +888,7 @@ dipakai nanti.
         f"  ŷ' = W_y × h₂ + b_y = {bt(p['W_y'])} × {a(s2['h'])} + {bt(p['b_y'])} = {a(sim.maju['yhat'])}",
     ])
 
-    d.teks(f"## {J[9]}")
+    d.teks(f"## {J[10]}")
     d.teks(f"Seluruh alur satu time step LSTM (t = 2, memori masuk c₁ = {a(s2['c_prev'])} "
            f"dan h₁ = {a(s2['h_prev'])}):")
     d.tabel(["Urutan", "Gambar", "Perhitungan", "Hasil", "Makna"],
@@ -720,8 +906,30 @@ ini dan bagaimana bobot diperbaiki dihitung pada langkah berikutnya, mulai dari
 {tautan('LSTM', 'forward_loss')}.
 """)
 
-    d.teks(f"## {J[10]}")
+    d.teks(f"## {J[11]}")
     d.teks("""
+**Persamaan (11)-(13).**
+
+1. Kalimat "Jika fungsi tanh dihubungkan dengan fungsi sigmoid…" sudah tepat, karena
+   persamaan (13) memang **hubungan** kedua fungsi, bukan hasil olahan (11) menjadi (12).
+2. Bagian *Keterangan* belum menjelaskan tanh(z), padahal simbol ini muncul di persamaan
+   (12) dan (13). Sebaiknya ditambahkan:
+   `tanh(z) = Fungsi aktivasi tangen hiperbolik`.
+3. Jika penjabaran persamaan (13) ingin dicantumkan, versi ringkas Cara 1 (bagian 3.3)
+   cukup ditulis dalam beberapa baris:
+""")
+    d.teks(r"$$\tanh(z) = \frac{e^{z}-e^{-z}}{e^{z}+e^{-z}}$$")
+    d.teks(r"$$= \frac{1-e^{-2z}}{1+e^{-2z}} \qquad \text{(pembilang dan penyebut dibagi } e^{z}\text{)}$$")
+    d.teks(r"$$= \frac{2-\left(1+e^{-2z}\right)}{1+e^{-2z}}$$")
+    d.teks(r"$$= 2\cdot\frac{1}{1+e^{-2z}} - 1$$")
+    d.teks(r"$$= 2\sigma(2z) - 1 \qquad \text{(karena } \sigma(2z) = \tfrac{1}{1+e^{-2z}}\text{)}$$")
+    d.teks("""
+Contoh kalimat pengantarnya:
+
+> Dengan membagi pembilang dan penyebut persamaan (12) dengan e^z, penyebutnya berbentuk
+> sama dengan penyebut fungsi sigmoid pada persamaan (11) untuk masukan 2z, sehingga
+> diperoleh persamaan (13).
+
 **Notasi Cₜ pada Gambar 1-6.** Gambar Olah (2015) memakai huruf besar Cₜ untuk cell
 state, sedangkan persamaan skripsi memakai cₜ. Satu kalimat penjelas dapat mencegah
 pertanyaan penguji, misalnya:
@@ -768,6 +976,8 @@ Perhitungan lengkap kedua time step ada di {tautan('GRU', 'forward_loss')}.
     d.teks(f"""
 Seperti pada LSTM, σ (0 sampai 1) berperan sebagai **keran** dan tanh (-1 sampai 1)
 sebagai **isi informasi**; penjelasan lengkapnya di {tautan('LSTM', 'alur_sel', '2. Cara Membaca Gambar')}.
+Rumus kedua fungsi itu dan penjabaran hubungannya, tanh(z) = 2σ(2z) − 1 (persamaan 11-13),
+ada di {tautan('LSTM', 'alur_sel', JUDUL_SIGMOID_TANH)}.
 GRU **hanya punya satu garis memori**, yaitu hₜ. Tidak ada cₜ terpisah dan tidak ada
 output gate.
 """)
@@ -1266,6 +1476,8 @@ $$\tanh'(a) = 4\,\sigma(2a)\bigl(1-\sigma(2a)\bigr)
 = 4\cdot\frac{1+\tanh(a)}{2}\cdot\frac{1-\tanh(a)}{2}
 = 1-\tanh^2(a)$$
 """)
+        d.teks(f"Persamaan (13) sendiri dijabarkan langkah demi langkah di "
+               f"{tautan('LSTM', 'alur_sel', JUDUL_SIGMOID_TANH)}.")
     else:
         d.teks(f"Asal turunan sigmoid dan tanh diuraikan di "
                f"{tautan('LSTM', 'bptt', '1. Rumus Turunan Dasar')}.")
