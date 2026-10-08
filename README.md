@@ -79,6 +79,7 @@ prediction-lstm-gru-btc/
 │   └── perhitungan_manual/             # perhitungan manual per tahap (.md)
 ├── tools/
 │   ├── bangun_notebook.py              # penyusun notebook (opsional)
+│   ├── simulasi_pelatihan_manual.py    # simulasi manual forward, loss, BPTT, dan Adam
 │   └── uji_cepat.py                    # uji cepat pipeline dengan grid kecil
 ├── requirements.txt
 └── README.md
@@ -192,6 +193,18 @@ Setiap perhitungan manual dilakukan **dua kali**: (a) langkah demi langkah
 dengan angka asli, lalu (b) dibandingkan dengan hasil *library* dan dicek dengan
 `assert` pada toleransi $10^{-5}$. Versi teksnya tersimpan di
 `outputs/perhitungan_manual/tahap_X.md` dan siap disalin ke Bab III.
+
+**Simulasi pelatihan bobot.** Berkas
+`outputs/perhitungan_manual/tahap_7_8_simulasi_pelatihan_lstm_gru.md` melengkapi
+tahap 7 dan 8 dengan menunjukkan *bagaimana* bobot dan bias diperoleh. Satu
+siklus pelatihan (*forward pass* → *loss* MSE → *backpropagation through time* →
+Adam) dihitung langkah demi langkah pada model mini 1 neuron untuk LSTM dan GRU,
+termasuk peran bias dan cara menghitungnya. Berkas ini dibuat oleh skrip terpisah
+yang hanya memakai pustaka standar Python (tanpa TensorFlow):
+
+```bash
+python tools/simulasi_pelatihan_manual.py
+```
 
 ---
 
