@@ -8,8 +8,12 @@ Agar setiap angka dapat diikuti dengan tangan, simulasi memakai model mini
 (1 neuron, 1 fitur, 2 time step, 1 sampel). Rumus yang dipakai sama dengan
 rumus Keras pada model penelitian (persamaan 15-31 pada draf skripsi).
 
-Keluaran:
-    outputs/perhitungan_manual/tahap_7_8_simulasi_pelatihan_lstm_gru.md
+Keluaran berupa seri empat berkas yang dibaca berurutan, semuanya memakai angka
+simulasi yang sama sehingga saling menyambung:
+    outputs/perhitungan_manual/tahap_7_8_1_alur_sel_lstm_gru.md      (Gambar 1-7)
+    outputs/perhitungan_manual/tahap_7_8_2_fungsi_loss_dan_adam.md   (subbab 1.5.11)
+    outputs/perhitungan_manual/tahap_7_8_3_simulasi_pelatihan_lstm_gru.md
+    outputs/perhitungan_manual/tahap_7_8_4_bias_lstm_gru.md
 
 Skrip hanya memakai pustaka standar Python sehingga dapat dijalankan tanpa
 TensorFlow. Angka konteks penelitian (jumlah sampel latih, batch size, rentang
@@ -29,7 +33,15 @@ AKAR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DIR_MANUAL = os.path.join(AKAR, "outputs", "perhitungan_manual")
 DIR_TABEL = os.path.join(AKAR, "outputs", "tabel")
 NOTEBOOK = os.path.join(AKAR, "notebooks", "btc_lstm_vs_gru.ipynb")
-BERKAS_KELUARAN = os.path.join(DIR_MANUAL, "tahap_7_8_simulasi_pelatihan_lstm_gru.md")
+DIR_GAMBAR = os.path.join(AKAR, "outputs", "gambar")
+
+# Seri berkas keluaran, dibaca berurutan
+SERI = [
+    ("tahap_7_8_1_alur_sel_lstm_gru.md", "Alur Sel LSTM dan GRU (Gambar 1-7)"),
+    ("tahap_7_8_2_fungsi_loss_dan_adam.md", "Fungsi Loss dan Adam"),
+    ("tahap_7_8_3_simulasi_pelatihan_lstm_gru.md", "Simulasi Satu Siklus Pelatihan LSTM dan GRU"),
+    ("tahap_7_8_4_bias_lstm_gru.md", "Bias pada LSTM dan GRU"),
+]
 
 # --------------------------------------------------------------------------- #
 # Pengaturan simulasi
@@ -281,12 +293,23 @@ def _csv(pola):
 
 
 def _model_terbaik(pola):
-    baris = [b for b in _csv(pola) if "TERBAIK" in (b.get("Keterangan") or "")]
+    semua = _csv(pola)
+    baris = [b for b in semua if "TERBAIK" in (b.get("Keterangan") or "")]
     assert len(baris) == 1, f"Model terbaik pada {pola} tidak ditemukan"
     b = baris[0]
-    return {"neuron": int(b["Neuron"]), "epoch": int(b["Epoch"]),
-            "rmse_val": float(b["RMSE Validasi (USD)"]),
-            "param": int(b["Jumlah Parameter"])}
+    hasil = {"neuron": int(b["Neuron"]), "epoch": int(b["Epoch"]),
+             "rmse_val": float(b["RMSE Validasi (USD)"]),
+             "param": int(b["Jumlah Parameter"])}
+    # RMSE validasi neuron terbaik untuk setiap jumlah epoch pada grid
+    hasil["per_epoch"] = {int(x["Epoch"]): float(x["RMSE Validasi (USD)"])
+                          for x in semua if int(x["Neuron"]) == hasil["neuron"]}
+    return hasil
+
+
+def _gambar(awalan):
+    berkas = sorted(glob.glob(os.path.join(DIR_GAMBAR, awalan + "*.png")))
+    assert berkas, f"Gambar {awalan}*.png tidak ditemukan di {DIR_GAMBAR}"
+    return "../gambar/" + os.path.basename(berkas[0])
 
 
 def _angka(pola, teks, jumlah):
@@ -322,6 +345,24 @@ def baca_konteks():
     k["lr"] = _angka(r'"LEARNING_RATE":\s*([0-9.]+)', sumber, 1)[0]
     k["val_loss_lstm"], k["val_loss_gru"] = _angka(
         r"Loss validasi epoch terakhir:\s+([0-9.]+)", keluaran, 2)
+    bentuk_val = re.findall(r"shape X_val\s+=\s+\((\d+), (\d+), (\d+)\)", keluaran)
+    assert len(bentuk_val) == 1, "Bentuk X_val tidak ditemukan pada keluaran notebook"
+    k["n_val"] = int(bentuk_val[0][0])
+    # Teks Bagian 2 menyatakan data tidak diacak dan tanpa early stopping
+    assert "shuffle=False" in sumber and "EarlyStopping" not in sumber
+    kurva = {kunci: _angka(pola, keluaran, 2) for kunci, pola in (
+        ("latih_awal", r"Loss latih[ \t]+epoch pertama[ \t]*:[ \t]*([0-9.]+)"),
+        ("latih_akhir", r"Loss latih[ \t]+epoch terakhir[ \t]*:[ \t]*([0-9.]+)"),
+        ("val_awal", r"Loss validasi epoch pertama[ \t]*:[ \t]*([0-9.]+)"),
+        ("val_akhir", r"Loss validasi epoch terakhir[ \t]*:[ \t]*([0-9.]+)"),
+        ("val_min", r"Loss validasi minimum[ \t]*:[ \t]*([0-9.]+)"),
+        ("epoch_min", r"Loss validasi minimum[ \t]*:[ \t]*[0-9.]+ \(epoch (\d+)\)"))}
+    k["kurva"] = {m: {kunci: nilai[i] for kunci, nilai in kurva.items()}
+                  for i, m in enumerate(("lstm", "gru"))}
+    for m in ("lstm", "gru"):
+        k["kurva"][m]["epoch_min"] = int(k["kurva"][m]["epoch_min"])
+    k["gambar_loss_lstm"] = _gambar("gambar_03_")
+    k["gambar_loss_gru"] = _gambar("gambar_04_")
 
     with open(os.path.join(DIR_MANUAL, "tahap_7_forward_pass_lstm.md"), encoding="utf-8") as f:
         teks = f.read()
@@ -384,97 +425,92 @@ def jangkar(judul):
 # Bagian dokumen
 # --------------------------------------------------------------------------- #
 JUDUL = {
-    0: "0. Gambaran Besar: Satu Siklus Pembobotan",
-    1: "1. Asumsi Simulasi dan Notasi",
+    1: "1. Asumsi Simulasi, Notasi, dan Siklus yang Dihitung",
     2: "2. Rumus Turunan Dasar yang Dipakai",
     3: "3. LSTM: Satu Siklus Pelatihan Langkah demi Langkah",
     4: "4. GRU: Satu Siklus Pelatihan Langkah demi Langkah",
-    5: "5. Bias: Mengapa Perlu dan Bagaimana Dihitung",
-    6: "6. Dari Model Mini ke Model Penelitian",
-    7: "7. Ringkasan Alur dan Hasil Verifikasi",
+    5: "5. Dari Model Mini ke Model Penelitian",
+    6: "6. Ringkasan Alur dan Hasil Verifikasi",
 }
 
+CATATAN_ANGKA = """
+**Cara membaca angka.** Seperti berkas perhitungan manual lainnya, angka memakai
+titik sebagai pemisah desimal dan koma sebagai pemisah ribuan. Angka ditampilkan
+6 desimal, tetapi skrip menghitung dengan presisi penuh, sehingga selisih
+pembulatan pada digit ke-6 bisa muncul saat Anda menjumlahkan angka yang tampil.
+Nomor persamaan dan gambar mengacu pada draf skripsi (subbab 1.5.7 sampai 1.5.11).
+"""
 
-def bagian_pembuka(d, k):
-    d.teks("# Perhitungan Manual - Tahap 7 & 8: Simulasi Pelatihan Bobot LSTM dan GRU")
+
+def tautan(nomor, sub=None):
+    """Tautan Markdown ke bagian lain dalam seri (opsional ke judul tertentu)."""
+    berkas, judul = SERI[nomor - 1]
+    if sub is None:
+        return f"[Bagian {nomor}]({berkas})"
+    return f"[Bagian {nomor}, subbagian {sub.split('.')[0]}]({berkas}#{jangkar(sub)})"
+
+
+def navigasi(d, nomor):
+    baris = ["**Seri perhitungan manual pelatihan LSTM dan GRU** (baca berurutan):", ""]
+    for i, (berkas, judul) in enumerate(SERI, 1):
+        if i == nomor:
+            baris.append(f"{i}. **{judul}** ← sedang dibaca")
+        else:
+            baris.append(f"{i}. [{judul}]({berkas})")
+    d.teks("\n".join(baris))
+
+
+def kepala(d, nomor):
+    d.teks(f"# Perhitungan Manual - Tahap 7 & 8 (Bagian {nomor} dari {len(SERI)}): {SERI[nomor - 1][1]}")
     d.teks("""
-> Berkas ini dibuat otomatis oleh `tools/simulasi_pelatihan_manual.py`.
-> Semua angka dihitung ulang oleh skrip itu dan diperiksa dengan `assert`
-> (lihat bagian 7). Untuk membuat ulang: `python tools/simulasi_pelatihan_manual.py`.
+> Berkas ini dibuat otomatis oleh `tools/simulasi_pelatihan_manual.py`. Semua
+> angka dihitung ulang oleh skrip itu dan diperiksa dengan `assert`. Untuk membuat
+> ulang seluruh seri: `python tools/simulasi_pelatihan_manual.py`.
 """)
-    d.teks("""
+    navigasi(d, nomor)
+
+
+def penutup(d, nomor):
+    baris = ["---", ""]
+    if nomor > 1:
+        berkas, judul = SERI[nomor - 2]
+        baris.append(f"← Sebelumnya: [Bagian {nomor - 1}. {judul}]({berkas})")
+        baris.append("")
+    if nomor < len(SERI):
+        berkas, judul = SERI[nomor]
+        baris.append(f"→ Berikutnya: [Bagian {nomor + 1}. {judul}]({berkas})")
+    else:
+        baris.append(f"Kembali ke awal seri: [Bagian 1. {SERI[0][1]}]({SERI[0][0]})")
+    d.teks("\n".join(baris))
+
+
+def daftar_isi(d, judul):
+    d.teks("**Daftar isi**")
+    d.teks("\n".join(f"- [{j}](#{jangkar(j)})" for j in judul.values()))
+
+
+# ------------------------------- Bagian 3 ---------------------------------- #
+def bagian_pembuka(d, k):
+    kepala(d, 3)
+    d.teks(f"""
+{tautan(1)} menjelaskan makna setiap gerbang pada Gambar 1-7, dan {tautan(2)}
+menjelaskan konsep fungsi loss serta Adam. Bagian ini **menghitung satu siklus
+pelatihan secara lengkap**: *forward pass* → *loss* → *backpropagation through time*
+(BPTT) → Adam, sampai bobot dan bias berubah dan loss turun.
+
 Berkas `tahap_7_forward_pass_lstm.md` dan `tahap_8_forward_pass_gru.md`
-menunjukkan bagaimana model yang **sudah dilatih** menghasilkan prediksi.
-Berkas ini menjawab pertanyaan sebelumnya: **bagaimana bobot dan bias itu
-diperoleh?** Jawabannya adalah pelatihan, yaitu satu siklus yang diulang
-ribuan kali: *forward pass* → *loss* → *backpropagation through time* (BPTT)
-→ Adam.
+menunjukkan bagaimana model yang **sudah dilatih** menghasilkan prediksi. Bagian
+ini menjawab pertanyaan sebelumnya: **bagaimana bobot dan bias itu diperoleh?**
 
 Agar setiap angka bisa diikuti dengan tangan, simulasi memakai **model mini**:
 1 neuron, 1 fitur, 2 time step, dan 1 sampel. Rumus dan urutan langkahnya
 **identik** dengan model penelitian; yang berbeda hanya jumlah angkanya.
-Bagian 6 menjelaskan cara memperbesarnya ke model penelitian
-(10 fitur, 7 time step, batch 32, 40/30 neuron).
+Subbagian 5 menjelaskan cara memperbesarnya ke model penelitian
+({k['n_fitur']} fitur, {k['lookback']} time step, batch {k['batch']},
+{k['lstm']['neuron']}/{k['gru']['neuron']} neuron).
 """)
-    d.teks("**Daftar isi**")
-    d.teks("\n".join(f"- [{JUDUL[i]}](#{jangkar(JUDUL[i])})" for i in sorted(JUDUL)))
-    d.teks("""
-**Cara membaca angka.** Seperti berkas perhitungan manual lainnya, angka memakai
-titik sebagai pemisah desimal dan koma sebagai pemisah ribuan. Angka
-ditampilkan 6 desimal, tetapi skrip menghitung dengan presisi penuh, sehingga
-selisih pembulatan pada digit ke-6 bisa muncul saat Anda menjumlahkan angka
-yang tampil. Nomor persamaan dan gambar mengacu pada draf skripsi
-(subbab 1.5.8 sampai 1.5.11).
-""")
-
-
-def bagian_0(d, k):
-    total_lstm = k["iter_epoch"] * k["lstm"]["epoch"]
-    total_gru = k["iter_epoch"] * k["gru"]["epoch"]
-    d.teks(f"## {JUDUL[0]}")
-    d.teks("""
-Model "belajar" dengan mengulang satu siklus yang sama. Satu siklus disebut
-**satu iterasi k**:
-""")
-    d.kode("""
-        ┌──────────────────────────────────────────────────────────────────┐
-        ▼                                                                  │
- Bobot & bias θ ─► (1) FORWARD ─► (2) LOSS ─► (3) BACKWARD (BPTT) ─► (4) ADAM
-                    prediksi ŷ'    seberapa     gradien g = ∂L/∂θ      θ baru
-                                   salah?       untuk setiap θ
-""")
-    d.tabel(
-        ["Langkah", "Pertanyaan yang dijawab", "Persamaan skripsi", "Di berkas ini"],
-        [["(1) Forward pass", "Dengan bobot sekarang, berapa prediksinya?",
-          "(15)-(21) LSTM, (23)-(26) GRU", "3.2, 4.2"],
-         ["(2) Loss", "Seberapa salah prediksinya?", "(28)", "3.3, 4.3"],
-         ["(3) Backward (BPTT)", "Bobot mana yang menyebabkan salah, ke arah mana?",
-          "aturan rantai (bagian 2)", "3.4-3.9, 4.4-4.9"],
-         ["(4) Adam", "Seberapa jauh setiap bobot digeser?", "(29)-(31)",
-          "3.10-3.13, 4.10-4.13"]])
-    d.teks(f"""
-**Berapa kali siklus ini terjadi di penelitian?** Data latih berisi
-{ribu(k['n_latih'])} sampel (jendela {k['lookback']} hari × {k['n_fitur']} fitur) dengan
-batch size {k['batch']}. Jadi satu epoch terdiri dari
-⌈{ribu(k['n_latih'])} / {k['batch']}⌉ = **{k['iter_epoch']} iterasi**
-({k['iter_epoch'] - 1} batch berisi {k['batch']} sampel dan 1 batch terakhir berisi
-{k['batch_akhir']} sampel).
-
-- LSTM terbaik ({k['lstm']['neuron']} neuron, {ribu(k['lstm']['epoch'])} epoch):
-  {k['iter_epoch']} × {ribu(k['lstm']['epoch'])} = **{ribu(total_lstm)} kali update**.
-- GRU terbaik ({k['gru']['neuron']} neuron, {ribu(k['gru']['epoch'])} epoch):
-  {k['iter_epoch']} × {ribu(k['gru']['epoch'])} = **{ribu(total_gru)} kali update**.
-""")
-    d.teks("**Kapan loss dan Adam dipakai?** Keduanya hanya bekerja saat pelatihan.")
-    d.tabel(
-        ["Tahap penelitian", "Loss MSE", "Adam"],
-        [["Inisialisasi model", "-", "m = 0, v = 0, k = 0"],
-         [f"Setiap batch latih ({k['iter_epoch']}× per epoch)",
-          "dihitung, menjadi sumber gradien", "memperbarui semua bobot dan bias"],
-         ["Akhir setiap epoch", "loss latih dan loss validasi dicatat (kurva loss)",
-          "tidak ada update dari data validasi"],
-         ["Pemilihan neuron dan epoch terbaik", "tidak (memakai RMSE validasi USD)", "tidak"],
-         ["Prediksi data uji dan evaluasi", "tidak", "tidak (bobot sudah beku)"]])
+    daftar_isi(d, JUDUL)
+    d.teks(CATATAN_ANGKA)
 
 
 def bagian_1(d, k):
@@ -510,6 +546,25 @@ biasnya diikuti: **bias forget gate LSTM = 1**, bias lain = 0.
              ["g", "gradien sebuah parameter = ∂L/∂θ"],
              ["m, v", "momen pertama dan kedua Adam (persamaan 29)"],
              ["k", "nomor iterasi (satu kali update = satu batch)"]])
+    d.teks("""
+**Siklus yang dihitung.** Satu siklus di bawah ini disebut **satu iterasi k**.
+Model penelitian mengulangnya ribuan kali; berapa kali dan kapan persisnya
+dijelaskan di """ + tautan(2, JUDUL_2[2]) + ".")
+    d.kode("""
+        ┌──────────────────────────────────────────────────────────────────┐
+        ▼                                                                  │
+ Bobot & bias θ ─► (1) FORWARD ─► (2) LOSS ─► (3) BACKWARD (BPTT) ─► (4) ADAM
+                    prediksi ŷ'    seberapa     gradien g = ∂L/∂θ      θ baru
+                                   salah?       untuk setiap θ
+""")
+    d.tabel(
+        ["Langkah", "Pertanyaan yang dijawab", "Persamaan skripsi", "LSTM", "GRU"],
+        [["(1) Forward pass", "Dengan bobot sekarang, berapa prediksinya?",
+          "(15)-(21) LSTM, (23)-(26) GRU", "3.2", "4.2"],
+         ["(2) Loss", "Seberapa salah prediksinya?", "(28)", "3.3", "4.3"],
+         ["(3) Backward (BPTT)", "Bobot mana yang menyebabkan salah, ke arah mana?",
+          "aturan rantai (subbagian 2)", "3.4-3.9", "4.4-4.9"],
+         ["(4) Adam", "Seberapa jauh setiap bobot digeser?", "(29)-(31)", "3.10-3.13", "4.10-4.13"]])
 
 
 def bagian_2(d, k):
@@ -591,6 +646,8 @@ def bagian_3(d, k, p, maju, mundur, num, latih):
 
     # 3.2 ------------------------------------------------------------------
     d.teks("### 3.2 Langkah 1: Forward Pass")
+    d.teks(f"Makna setiap gerbang dan alurnya pada Gambar 1-6 dijelaskan di {tautan(1)}; "
+           "di sini dihitung angkanya untuk kedua time step.")
     d.teks(r"""
 Rumus versi 1 neuron (persamaan 15-21). Karena hanya ada satu neuron, semua
 bobot berupa angka tunggal (skalar), bukan matriks:
@@ -652,6 +709,7 @@ h_t = o_t \tanh(c_t) \qquad
     d.teks(f"""
 Prediksi masih **terlalu rendah** ({a(maju['yhat'])} padahal seharusnya {Y}).
 Langkah berikutnya mencari tahu bobot mana yang perlu diubah agar loss ini turun.
+Konsep MSE dan alasan pemakaiannya dibahas di {tautan(2, JUDUL_2[3])}.
 """)
 
     # 3.4 ------------------------------------------------------------------
@@ -987,19 +1045,14 @@ sebelumnya. Berikut perhitungan Adam untuk dua parameter yang sama:
         ]
     d.kode(baris)
     if ringkas:
-        d.teks("Tabel koreksi bias (1 − βᵏ) pada bagian 3.12 berlaku sama untuk GRU.")
+        d.teks("Penjelasan momentum dan koreksi bias pada 3.12 berlaku sama untuk GRU.")
     else:
-        d.teks("""
-m₂ menggabungkan arah gradien iterasi 1 dan 2. Jika suatu saat gradien
-berbalik arah (misalnya ketika bobot melewati titik minimum), m akan mengecil
-dan langkahnya otomatis melambat. Koreksi bias (1 − βᵏ) makin lama makin
-mendekati 1, sehingga pengaruhnya hilang setelah banyak iterasi:
+        d.teks(f"""
+m₂ menggabungkan arah gradien iterasi 1 dan 2. Jika suatu saat gradien berbalik arah
+(misalnya ketika bobot melewati titik minimum), m akan mengecil dan langkahnya
+otomatis melambat. Koreksi bias (1 − βᵏ) makin lama makin mendekati 1, sehingga
+pengaruhnya hilang setelah banyak iterasi; tabelnya ada di {tautan(2, JUDUL_2[8])}.
 """)
-        d.tabel(["Iterasi k", "Keterangan", "1 - 0.9ᵏ (pembagi m)", "1 - 0.999ᵏ (pembagi v)"],
-                [[ribu(kk), ket, a(1 - B1 ** kk, 6), a(1 - B2 ** kk, 6)]
-                 for kk, ket in ((1, "iterasi pertama"), (2, "iterasi kedua"),
-                                 (26, "akhir epoch 1 penelitian"), (1000, "± epoch 38"),
-                                 (2600, "akhir epoch 100"), (13000, "akhir epoch 500"))])
 
     # perjalanan loss ------------------------------------------------------
     d.teks(f"### {n_}.13 Siklus Diulang: Perjalanan Loss")
@@ -1029,7 +1082,7 @@ def bagian_4(d, k, p, maju, mundur, num, latih):
 Urutan langkahnya sama persis dengan LSTM. Yang berbeda hanya rumus di dalam
 sel: GRU tidak punya cell state, punya tiga himpunan bobot (z, r, kandidat), dan
 setiap gerbang punya **dua bias** (bias masukan dan bias rekuren) karena Keras
-memakai `reset_after=True` (lihat bagian 5.4).
+memakai `reset_after=True` (lihat """ + tautan(4, JUDUL_4[4]) + """).
 """)
 
     # 4.1 ------------------------------------------------------------------
@@ -1051,6 +1104,8 @@ memakai `reset_after=True` (lihat bagian 5.4).
 
     # 4.2 ------------------------------------------------------------------
     d.teks("### 4.2 Langkah 1: Forward Pass")
+    d.teks(f"Alur Gambar 7 langkah demi langkah dijelaskan di {tautan(1, JUDUL_1[9])}; "
+           "di sini dihitung angkanya untuk kedua time step.")
     d.teks(r"""
 Rumus versi 1 neuron (persamaan 23-26). Untuk kandidat, bagian rekurennya
 diberi nama $q_t$ supaya terlihat jelas apa yang dikalikan reset gate:
@@ -1247,202 +1302,775 @@ $\delta\tilde{h}_t$.
 Perhatikan pasangan bias pada tabel terakhir: **b_z(in) = b_z(rec) = {a(akhir['b_z_in'])}**
 dan **b_r(in) = b_r(rec) = {a(akhir['b_r_in'])}** tetap kembar sampai akhir,
 sedangkan **b_h(in) = {a(akhir['b_h_in'])}** dan **b_h(rec) = {a(akhir['b_h_rec'])}**
-berbeda. Bagian 5.4 menjelaskan sebabnya.
+berbeda. {tautan(4, JUDUL_4[4])} menjelaskan sebabnya.
 """)
 
 
 # ------------------------------- Bias -------------------------------------- #
-def bagian_5(d, k, lstm, gru):
-    gl, gg = lstm["mundur"]["g"], gru["mundur"]["g"]
-    rl = lstm["mundur"]["rincian"]
-    d.teks(f"## {JUDUL[5]}")
+# ------------------------------- Bagian 1 ---------------------------------- #
+JUDUL_1 = {
+    1: "1. Cara Membaca Gambar",
+    2: "2. Gambar 1: Struktur LSTM",
+    3: "3. Gambar 2: Cell State",
+    4: "4. Gambar 3: Forget Gate",
+    5: "5. Gambar 4: Input Gate",
+    6: "6. Gambar 5: Pembaruan Cell State",
+    7: "7. Gambar 6: Output Gate",
+    8: "8. Ringkasan Satu Langkah LSTM",
+    9: "9. Gambar 7: Struktur Sel GRU",
+    10: "10. Hubungan LSTM dan GRU",
+    11: "11. Catatan untuk Naskah Skripsi",
+}
 
-    d.teks("### 5.1 Intinya")
-    d.teks("""
-Bias adalah **titik awal (intercept)** setiap gerbang dan neuron, sama seperti
-intercept *a* pada regresi y = a + bx. Bobot hanya bisa *mengalikan* masukan.
-Tanpa bias, ketika masukannya nol, setiap gerbang dipaksa bernilai tetap
-(σ(0) = 0.5, selalu setengah terbuka; tanh(0) = 0). Dengan bias, setiap gerbang
-dapat menentukan **posisi bawaannya sendiri**. Bias tidak dihitung dengan satu
-rumus langsung; bias **dipelajari** lewat siklus yang sama dengan bobot
-(bagian 5.3).
-""")
 
-    # 5.2 ------------------------------------------------------------------
-    d.teks("### 5.2 Mengapa Bias Diperlukan")
-    d.teks("""
-**(a) Tanpa bias, gerbang terkunci di σ(0) = 0.5 saat masukannya nol.** Ini
-sering terjadi di penelitian: h₀ = 0 di awal setiap jendela 7 hari, dan
-normalisasi min-max membuat fitur bernilai dekat 0 ketika nilainya mendekati
-minimum data latih.
-
-**(b) Bias menggeser ambang buka-tutup gerbang.** Pada σ(W·x + b), bobot W
-mengatur kecuraman kurva, bias b mengatur posisinya (gerbang = 0.5 saat
-x = −b/W). Contoh satu fitur ternormalisasi x ∈ [0, 1] dengan W = 5:
-""")
-    d.tabel(["x", "Dengan bias: σ(5x − 2.5)", "Tanpa bias: σ(5x)"],
-            [[f"{x:g}", a(sig(5 * x - 2.5), 3), a(sig(5 * x), 3)] for x in (0, 0.25, 0.5, 0.75, 1)])
-    d.teks("""
-Tanpa bias, gerbang **tidak pernah turun di bawah 0.5** untuk data
-ternormalisasi yang positif, sehingga model tidak bisa menyatakan aturan "tutup
-gerbang saat nilai fitur rendah, buka saat tinggi".
-
-**(c) Bias menentukan perilaku bawaan setiap gerbang.** Contoh terpenting:
-forget gate LSTM. Jika gerbang hanya ditentukan oleh biasnya, sisa memori
-setelah 7 hari adalah f⁷:
-""")
-    bf = k["bias_lstm"]["f"]
-    d.tabel(["Bias forget", "f = σ(b)", "Memori tersisa setelah 7 hari (f⁷)"],
-            [[lbl, a(sig(b), 3), persen(sig(b) ** 7)]
-             for lbl, b in (("0 (tanpa bias)", 0.0), (f"{a(bf)} (neuron ke-1 LSTM terlatih)", bf),
-                            ("1 (inisialisasi Keras)", 1.0), ("2", 2.0))])
-    d.teks("""
-Tanpa bias, memori langsung susut separuh setiap hari. Itulah alasan Keras
-mengisi **b_f = 1** di awal pelatihan (*unit forget bias*).
-
-Nilai bawaan gerbang pada **model terlatih penelitian** (neuron ke-1, saat
-kontribusi xW + hU = 0), dibaca dari `tahap_7_forward_pass_lstm.md` dan
-`tahap_8_forward_pass_gru.md`:
-""")
-    bl, bg = k["bias_lstm"], k["bias_gru"]
-    d.tabel(["Model", "Gerbang", "Bias", "Nilai bawaan", "Arti"],
-            [["LSTM", "input i", a(bl["i"]), f"σ = {a(sig(bl['i']), 3)}", "cenderung hemat menerima informasi baru"
-              if sig(bl["i"]) < 0.5 else "cenderung menerima informasi baru"],
-             ["LSTM", "forget f", a(bl["f"]), f"σ = {a(sig(bl['f']), 3)}", "cenderung mempertahankan memori"
-              if sig(bl["f"]) > 0.5 else "cenderung membuang memori"],
-             ["LSTM", "kandidat c̃", a(bl["c"]), f"tanh = {a(math.tanh(bl['c']), 3)}", "isi bawaan hampir netral"
-              if abs(bl["c"]) < 0.1 else "isi bawaan tidak netral"],
-             ["LSTM", "output o", a(bl["o"]), f"σ = {a(sig(bl['o']), 3)}", "cenderung menahan sebagian keluaran"
-              if sig(bl["o"]) < 0.5 else "cenderung mengeluarkan memori"],
-             ["GRU", "update z", f"{a(bg['z'][0])} + {kr(bg['z'][1])}", f"σ = {a(sig(sum(bg['z'])), 3)}",
-              f"cenderung mempertahankan {persen(sig(sum(bg['z'])), 0)} memori lama"],
-             ["GRU", "reset r", f"{a(bg['r'][0])} + {kr(bg['r'][1])}", f"σ = {a(sig(sum(bg['r'])), 3)}",
-              f"memakai sekitar {persen(sig(sum(bg['r'])), 0)} masa lalu untuk kandidat"]])
+def seri_1_alur_sel(d, k, lstm, gru):
+    p, q = LSTM_AWAL, GRU_AWAL
+    s2 = lstm["maju"]["langkah"][1]
+    g2 = gru["maju"]["langkah"][1]
+    r1 = lstm["mundur"]["rincian"][0]
+    rg2 = gru["mundur"]["rincian"][1]
+    porsi_c = r1["dc_lanjut"] / r1["dc"]
+    porsi_z = rg2["suku_h"][0] / rg2["dh_prev"]
+    kepala(d, 1)
     d.teks(f"""
-**(d) Bias dense menggeser tingkat dasar prediksi.** h_T selalu berada di
-rentang (−1, 1), jadi b_y yang menentukan "tingkat dasar" prediksi dan W_y
-cukup menangani variasinya. Pada model terlatih, b_y LSTM = {a(k['by_lstm'])}
-(setara {a(k['by_lstm'])} × {usd(k['rentang'])} ≈ **{usd(k['by_lstm'] * k['rentang'])} USD**)
-dan b_y GRU = {a(k['by_gru'])} (≈ **{usd(k['by_gru'] * k['rentang'])} USD**).
-Tanpa b_y, prediksi dipaksa jatuh ke harga terendah data latih
-({usd(k['x_min'])} USD) setiap kali h_T = 0.
+Bagian ini menjelaskan alur **Gambar 1 sampai Gambar 7** pada subbab 1.5.8 (LSTM)
+dan 1.5.9 (GRU) langkah demi langkah: apa yang mengalir di setiap garis, apa yang
+dikerjakan setiap kotak, dan apa fungsinya.
 
-**(e) Bias selalu menerima sinyal belajar.** ∂L/∂W = Σ δ·x dan ∂L/∂U = Σ δ·hₜ₋₁
-bernilai nol bila masukannya nol (lihat ∂L/∂U di 3.8: pada t = 1 tidak ada
-kontribusi karena h₀ = 0), sedangkan ∂L/∂b = Σ δ tidak dikalikan apa pun.
-
-**(f) Biayanya kecil.** Pada model penelitian, bias hanya
-{4 * k['lstm']['neuron'] + 1} dari {ribu(k['lstm']['param'])} parameter LSTM
-({persen((4 * k['lstm']['neuron'] + 1) / k['lstm']['param'])}) dan
-{6 * k['gru']['neuron'] + 1} dari {ribu(k['gru']['param'])} parameter GRU
-({persen((6 * k['gru']['neuron'] + 1) / k['gru']['param'])}).
+Supaya setiap langkah punya angka nyata, contoh angka diambil dari **simulasi
+model mini** yang dihitung lengkap di {tautan(3)}: 1 neuron, 1 fitur, data
+x₁ = {X[0]} dan x₂ = {X[1]}, bobot awal bulat (W_f = {bt(p['W_f'])}, U_f = {bt(p['U_f'])},
+b_f = {bt(p['b_f'])}, dan seterusnya; tabel lengkapnya di {tautan(3, JUDUL[3])}).
+Contoh memakai **time step t = 2**, karena di sana memori dari t = 1 sudah ikut
+bekerja. Angka yang sama dipakai lagi di Bagian 2 dan 3 saat menghitung loss,
+gradien, dan Adam, sehingga seluruh seri saling menyambung.
 """)
+    daftar_isi(d, JUDUL_1)
+    d.teks(CATATAN_ANGKA)
 
-    # 5.3 ------------------------------------------------------------------
-    d.teks("### 5.3 Cara Menghitung Bias Langkah demi Langkah")
+    # 1 ---------------------------------------------------------------------
+    d.teks(f"## {JUDUL_1[1]}")
+    d.teks("Gambar 1-6 berasal dari Olah (2015), dan Gambar 7 mengikuti gaya yang sama. Simbolnya:")
+    d.tabel(["Simbol", "Arti"],
+            [["Kotak kuning (σ atau tanh)",
+              "lapisan jaringan saraf yang **punya bobot dan bias** (W, U, b) dan dipelajari saat pelatihan"],
+             ["Lingkaran merah muda (×, +, 1−)",
+              "operasi elemen demi elemen **tanpa bobot**; × = perkalian Hadamard (⊙), + = penjumlahan"],
+             ["Oval merah muda \"tanh\" (Gambar 1 dan 6)",
+              "fungsi tanh biasa **tanpa bobot**, hanya memampatkan nilai ke rentang -1 sampai 1"],
+             ["Dua garis menyatu",
+              "hₜ₋₁ dan xₜ menjadi masukan bersama sebuah gerbang (di skripsi ditulis xₜW + hₜ₋₁U)"],
+             ["Satu garis bercabang", "nilai yang sama disalin ke dua tujuan"],
+             ["Cₜ (huruf besar) pada gambar Olah", "sama dengan cₜ (cell state) pada persamaan skripsi"]])
     d.teks("""
-Bias diperlakukan **persis seperti bobot**. Berikut lima langkahnya, dengan
-rujukan ke bagian yang sudah dihitung di atas:
+**Mengapa σ dipakai untuk gerbang dan tanh untuk isi?**
+
+- **Sigmoid (0 sampai 1)** berfungsi seperti **keran**: 0 berarti tertutup, 1 berarti
+  terbuka penuh, 0.5 berarti setengah. Nilainya adalah *proporsi*, jadi selalu dipakai
+  untuk **mengalikan** sesuatu.
+- **Tanh (-1 sampai 1)** berfungsi sebagai **isi informasi**. Nilainya bisa positif
+  atau negatif sehingga memori bisa dinaikkan atau diturunkan, dan tetap terbatas
+  sehingga tidak meledak.
 """)
-    lat = lstm["latih"]
+
+    # 2 ---------------------------------------------------------------------
+    d.teks(f"## {JUDUL_1[2]}")
+    d.teks(f"""
+**Alurnya:**
+
+1. Ketiga kotak hijau berlabel **A** adalah **sel yang sama** (bobot yang sama) yang
+   digambar berulang untuk setiap waktu: kiri untuk t − 1, tengah untuk t, kanan
+   untuk t + 1. Cara menggambar ini disebut *unrolling*.
+2. Setiap sel menerima **masukan dari bawah** (xₜ₋₁, xₜ, xₜ₊₁) dan menghasilkan
+   **keluaran ke atas** (hₜ₋₁, hₜ, hₜ₊₁).
+3. Di antara sel ada **dua garis horizontal** yang membawa memori ke langkah
+   berikutnya: garis **atas** adalah **cell state cₜ** (memori jangka panjang), garis
+   **bawah** adalah **hidden state hₜ** (memori jangka pendek sekaligus keluaran).
+4. Isi sel tengah adalah 4 kotak kuning, dari kiri: **σ (forget gate), σ (input
+   gate), tanh (kandidat), σ (output gate)**. Gambar 3-6 membedahnya satu per satu.
+
+**Fungsinya:** RNN biasa (persamaan 10) hanya punya satu garis, yaitu h. LSTM
+menambahkan garis cₜ dan tiga gerbang yang mengatur apa yang dibuang, disimpan,
+dan dikeluarkan.
+
+**Kaitan dengan penelitian:** dengan *window* {k['lookback']} hari, sel A dijalankan
+**{k['lookback']} kali berturut-turut** (xₜ₋₆ sampai xₜ), dan setiap xₜ berisi
+{k['n_fitur']} fitur blockchain ternormalisasi. Di awal, h₀ = c₀ = 0 (bawaan Keras).
+Hanya hidden state **langkah terakhir h_T** yang diteruskan ke lapisan dense
+(persamaan 21). Model mini di seri ini sama, hanya dijalankan 2 kali (t = 1 dan
+t = 2), lalu h₂ masuk ke dense.
+""")
+
+    # 3 ---------------------------------------------------------------------
+    d.teks(f"## {JUDUL_1[3]}")
+    d.teks(f"""
+**Alurnya:**
+
+1. cₜ₋₁ masuk dari kiri.
+2. cₜ₋₁ melewati lingkaran **×**: sebagian memori lama dihapus (dikalikan fₜ).
+3. Hasilnya melewati lingkaran **+**: informasi baru ditambahkan (iₜ × c̃ₜ).
+4. Keluar ke kanan sebagai **cₜ** dan masuk ke langkah waktu berikutnya.
+
+**Fungsinya:** cell state adalah **jalan tol memori**. Di sepanjang garis ini hanya
+ada perkalian dan penjumlahan sederhana; tidak ada perkalian matriks bobot dan tidak
+ada fungsi aktivasi yang berulang.
+
+Inilah alasan LSTM tahan terhadap *vanishing gradient*. Saat *backpropagation*,
+gradien yang mengalir mundur di jalur ini hanya dikalikan fₜ. Jika model memutuskan
+untuk mengingat (fₜ mendekati 1), gradien hampir tidak mengecil. Buktinya ada pada
+perhitungan {tautan(3)} subbagian 3.7: **{persen(porsi_c)}** sinyal kesalahan yang
+sampai ke c₁ datang lewat jalur cell state ini.
+""")
+
+    # 4 ---------------------------------------------------------------------
+    d.teks(f"## {JUDUL_1[4]}")
+    d.teks("""
+**Alurnya:**
+
+1. **hₜ₋₁** (masuk dari kiri) dan **xₜ** (masuk dari bawah) bertemu dan menjadi
+   masukan bersama.
+2. Keduanya masuk ke **kotak kuning σ pertama** dan dihitung pra-aktivasinya:
+   xₜW_f + hₜ₋₁U_f + b_f (persamaan 15).
+3. Hasilnya dilewatkan ke sigmoid sehingga menjadi **fₜ**, bernilai 0 sampai 1.
+4. Panah fₜ naik ke lingkaran **×** di garis cell state dan **mengalikan cₜ₋₁**.
+
+**Fungsinya:** menentukan **berapa banyak memori lama yang dipertahankan**. fₜ
+mendekati 0 berarti memori dihapus; fₜ mendekati 1 berarti memori dipertahankan utuh.
+""")
     d.kode([
-        "Langkah 1 — Nilai awal (3.1 dan 4.1)",
-        "  Bias gerbang = 0, kecuali bias forget gate LSTM = 1. Bias dense b_y = 0.",
-        "",
-        "Langkah 2 — Dipakai di forward pass (3.2 dan 4.2)",
-        "  Gerbang : a = W × x + U × h + b",
-        "  Dense   : ŷ' = W_y × h_T + b_y",
-        "",
-        "Langkah 3 — Hitung gradiennya (3.8 dan 4.8)",
-        "  Karena a = W × x + U × h + b, maka ∂a/∂b = 1, sehingga",
-        "  ∂L/∂b = δ × 1 = δ, dijumlahkan untuk semua time step:  ∂L/∂b = Σ δ",
-        f"  Contoh b_y   : ∂L/∂b_y = ∂L/∂ŷ' × 1 = {a(gl['b_y'])}",
-        f"  Contoh b_c   : ∂L/∂b_c = δc̃₁ + δc̃₂ = {kr(rl[0]['delta_c'])} + {kr(rl[1]['delta_c'])} = {a(gl['b_c'])}",
-        "",
-        "Langkah 4 — Update dengan Adam (3.10 dan 3.12)",
-        f"  b_y: 0 → {a(lat['p'][1]['b_y'])} (k = 1) → {a(lat['p'][2]['b_y'])} (k = 2)",
-        "",
-        "Langkah 5 — Ulangi siklus",
-        f"  Setelah {ITERASI} iterasi b_y = {a(lat['p'][-1]['b_y'])}. Pada model penelitian, b_y LSTM = {a(k['by_lstm'])}",
-        f"  adalah hasil akhir proses yang sama setelah {ribu(k['iter_epoch'] * k['lstm']['epoch'])} iterasi.",
+        f"Contoh angka (t = 2). Dari t = 1 sudah diperoleh h₁ = {a(s2['h_prev'])} dan c₁ = {a(s2['c_prev'])}.",
+        f"  a  = W_f × x₂ + U_f × h₁ + b_f = {bt(p['W_f'])} × {X[1]} + {bt(p['U_f'])} × {a(s2['h_prev'])}"
+        f" + {bt(p['b_f'])} = {a(s2['a_f'])}",
+        f"  f₂ = σ({a(s2['a_f'])}) = {a(s2['f'])}",
+        f"  Memori lama yang dipertahankan: f₂ × c₁ = {a(s2['f'])} × {a(s2['c_prev'])} = {a(s2['f'] * s2['c_prev'])}",
+        f"  Artinya {persen(s2['f'])} isi memori lama dipertahankan dan {persen(1 - s2['f'])} dibuang.",
     ])
-    d.teks("Ringkasan rumus gradien seluruh bias pada simulasi ini (iterasi k = 1):")
-    d.tabel(["Bias", "Rumus gradien", "Nilai pada simulasi"],
-            [["Dense b_y (LSTM)", "∂L/∂ŷ′", a(gl["b_y"])],
-             ["LSTM b_f", "δf₁ + δf₂", a(gl["b_f"])],
-             ["LSTM b_i", "δi₁ + δi₂", a(gl["b_i"])],
-             ["LSTM b_c", "δc̃₁ + δc̃₂", a(gl["b_c"])],
-             ["LSTM b_o", "δo₁ + δo₂", a(gl["b_o"])],
-             ["Dense b_y (GRU)", "∂L/∂ŷ′", a(gg["b_y"])],
-             ["GRU b_z(in) dan b_z(rec)", "keduanya δz₁ + δz₂", f"{a(gg['b_z_in'])} dan {a(gg['b_z_rec'])}"],
-             ["GRU b_r(in) dan b_r(rec)", "keduanya δr₁ + δr₂", f"{a(gg['b_r_in'])} dan {a(gg['b_r_rec'])}"],
-             ["GRU b_h(in)", "δh̃₁ + δh̃₂", a(gg["b_h_in"])],
-             ["GRU b_h(rec)", "δh̃₁·r₁ + δh̃₂·r₂", a(gg["b_h_rec"])]])
-
-    # 5.4 ------------------------------------------------------------------
-    d.teks("### 5.4 Dua Bias pada GRU: Asal dan Buktinya")
-    d.teks("""
-**Letaknya pada Gambar 7.** Bias tidak digambar; bias berada di dalam setiap
-kotak kuning (σ, σ, tanh). Setiap kotak menerima dua garis masuk, yaitu xₜ dari
-bawah dan hₜ₋₁ dari garis vertikal kiri. Dengan `reset_after=True`, Keras
-menghitung kedua garis itu terpisah, masing-masing dengan biasnya sendiri:
-garis xₜ membawa **bias masukan** (xₜW + b(in)) dan garis hₜ₋₁ membawa **bias
-rekuren** (hₜ₋₁U + b(rec)).
-""")
-    d.kode("""
-Kotak σ untuk z (dan r, sama persis): kedua cabang langsung dijumlahkan
-  h_(t-1) ──► h_(t-1) × U_z + b_z(rec) ──┐
-                                         (+) ──► σ ──► z_t
-  x_t ─────► x_t × W_z + b_z(in) ────────┘
-
-Kotak tanh untuk kandidat: cabang h_(t-1) melewati lingkaran × milik r_t dulu
-  h_(t-1) ──► h_(t-1) × U_h + b_h(rec) ──► (× r_t) ──┐
-                                                     (+) ──► tanh ──► h̃_t
-  x_t ─────► x_t × W_h + b_h(in) ─────────────────────┘
-""")
-    bg = k["bias_gru"]
-    akhir = gru["latih"]["p"][-1]
     d.teks(f"""
-**Pada z dan r, dua bias sebenarnya berlebih.** b(in) + b(rec) langsung
-dijumlahkan, jadi gradien keduanya selalu sama. Karena nilai awalnya juga sama
-(0), keduanya akan selalu kembar:
-
-- simulasi: setelah {ITERASI} iterasi, b_z(in) = b_z(rec) = {a(akhir['b_z_in'])} dan
-  b_r(in) = b_r(rec) = {a(akhir['b_r_in'])};
-- model GRU terlatih penelitian (neuron ke-1): b_z(in) = {a(bg['z'][0])},
-  b_z(rec) = {a(bg['z'][1])}; b_r(in) = {a(bg['r'][0])}, b_r(rec) = {a(bg['r'][1])}.
-
-**Pada kandidat, dua bias berbeda peran.** b_h(rec) ikut dikalikan rₜ (jika
-rₜ mendekati 0, bias ini ikut "dimatikan" bersama memori lama), sedangkan
-b_h(in) selalu aktif. Gradiennya berbeda (Σ δh̃·r vs Σ δh̃), sehingga nilainya
-juga berbeda:
-
-- simulasi: gradien {a(gru['mundur']['g']['b_h_in'])} vs {a(gru['mundur']['g']['b_h_rec'])};
-  setelah {ITERASI} iterasi b_h(in) = {a(akhir['b_h_in'])} dan b_h(rec) = {a(akhir['b_h_rec'])};
-- model terlatih (neuron ke-1): b_h(in) = {a(bg['h'][0])} dan b_h(rec) = {a(bg['h'][1])}.
-
-**Asal-usulnya.** Persamaan asli Cho et al. (2014) tidak memuat bias sama sekali
-(penulisnya menyebut *"to make the equations uncluttered, we omit biases"*).
-Bentuk dua bias berasal dari implementasi GRU pada pustaka **NVIDIA cuDNN**, yang
-memisahkan bagian masukan dan bagian rekuren setiap gerbang. Keras memakainya
-sebagai bawaan (`reset_after=True`, *"cuDNN compatible"*). LSTM di Keras cukup
-memakai satu bias karena pada LSTM semua bias hanya dijumlahkan sehingga selalu
-bisa digabung.
-
-**Dampak ke jumlah parameter (persamaan 27).** GRU {k['gru']['neuron']} neuron
-memiliki 2 × 3 × {k['gru']['neuron']} = {6 * k['gru']['neuron']} bias gerbang
-(Tabel 12: bias berbentuk (2, {3 * k['gru']['neuron']})). Dengan satu bias
-jumlahnya hanya {3 * k['gru']['neuron']}, sehingga total parameter menjadi
-{ribu(k['gru']['param'] - 3 * k['gru']['neuron'])}, bukan {ribu(k['gru']['param'])}.
+Bias forget bernilai 1 (*unit forget bias* Keras). Karena itu, walaupun xₜ dan hₜ₋₁
+bernilai nol, gerbang ini tetap bernilai σ(1) = {a(sig(1.0), 3)}: secara bawaan model
+cenderung **mengingat**. Peran bias dijelaskan lengkap di {tautan(4)}.
 """)
-    assert akhir["b_z_in"] == akhir["b_z_rec"] and akhir["b_r_in"] == akhir["b_r_rec"]
-    assert abs(akhir["b_h_in"] - akhir["b_h_rec"]) > 1e-3
-    assert bg["z"][0] == bg["z"][1] and bg["r"][0] == bg["r"][1]
+
+    # 5 ---------------------------------------------------------------------
+    d.teks(f"## {JUDUL_1[5]}")
+    d.teks("""
+Gambar ini memiliki **dua cabang paralel** dari masukan yang sama (hₜ₋₁ dan xₜ).
+
+**Alurnya:**
+
+1. **Cabang kiri, kotak σ kedua**, menghasilkan **iₜ** (0 sampai 1, persamaan 16):
+   keran yang menentukan **berapa banyak** informasi baru boleh masuk.
+2. **Cabang kanan, kotak tanh**, menghasilkan **c̃ₜ** (-1 sampai 1, persamaan 17):
+   **isi informasi baru** yang diusulkan.
+3. Kedua cabang bertemu di lingkaran **×** sehingga menjadi iₜ × c̃ₜ.
+4. Hasilnya naik ke lingkaran **+** di garis cell state.
+
+**Fungsinya:** menentukan **informasi baru apa yang ditulis ke memori**. c̃ₜ menjawab
+"apa isinya?", sedangkan iₜ menjawab "seberapa penting untuk disimpan?". Karena c̃ₜ
+bisa negatif, informasi baru bisa menaikkan atau menurunkan memori.
+""")
+    d.kode([
+        "Contoh angka (t = 2):",
+        f"  i₂ = σ(W_i × x₂ + U_i × h₁ + b_i) = σ({bt(p['W_i'])} × {X[1]} + {bt(p['U_i'])} × {a(s2['h_prev'])}"
+        f" + {bt(p['b_i'])}) = σ({a(s2['a_i'])}) = {a(s2['i'])}",
+        f"  c̃₂ = tanh(W_c × x₂ + U_c × h₁ + b_c) = tanh({bt(p['W_c'])} × {X[1]} + {bt(p['U_c'])} × {a(s2['h_prev'])}"
+        f" + {bt(p['b_c'])}) = tanh({a(s2['a_c'])}) = {a(s2['cc'])}",
+        f"  Informasi baru yang ditulis: i₂ × c̃₂ = {a(s2['i'])} × {a(s2['cc'])} = {a(s2['i'] * s2['cc'])}",
+        f"  Artinya usulan isi {a(s2['cc'])} hanya masuk {persen(s2['i'])}.",
+    ])
+
+    # 6 ---------------------------------------------------------------------
+    d.teks(f"## {JUDUL_1[6]}")
+    d.teks("""
+Gambar ini menggabungkan hasil Gambar 3 dan Gambar 4 di garis atas (persamaan 18):
+
+**cₜ = fₜ ⊙ cₜ₋₁ + iₜ ⊙ c̃ₜ**
+
+**Alurnya:** cₜ₋₁ dikalikan fₜ (memori lama terseleksi), lalu ditambah iₜ × c̃ₜ
+(memori baru terseleksi). Hasilnya adalah **cₜ**, memori jangka panjang yang sudah
+diperbarui, yang dikirim ke langkah waktu berikutnya.
+
+**Fungsinya:** di sinilah memori benar-benar ditulis ulang. Karena fₜ dan iₜ
+**independen**, LSTM bisa sekaligus mempertahankan banyak memori lama dan menambah
+banyak memori baru. Ini salah satu pembeda utama dengan GRU (subbagian 10).
+""")
+    d.kode([
+        "Contoh angka (t = 2), memakai hasil Gambar 3 dan Gambar 4:",
+        f"  c₂ = f₂ × c₁ + i₂ × c̃₂ = {a(s2['f'] * s2['c_prev'])} + {a(s2['i'] * s2['cc'])} = {a(s2['c'])}",
+        f"  Memori berubah dari c₁ = {a(s2['c_prev'])} menjadi c₂ = {a(s2['c'])}.",
+    ])
+
+    # 7 ---------------------------------------------------------------------
+    d.teks(f"## {JUDUL_1[7]}")
+    d.teks("""
+**Alurnya:**
+
+1. hₜ₋₁ dan xₜ masuk ke **kotak σ keempat** dan menghasilkan **oₜ** (0 sampai 1,
+   persamaan 19).
+2. Sementara itu, **cₜ** dari garis atas bercabang turun ke **oval tanh** (tanpa bobot)
+   yang memampatkan cₜ ke rentang -1 sampai 1.
+3. tanh(cₜ) dan oₜ bertemu di lingkaran **×** sehingga menjadi **hₜ = oₜ ⊙ tanh(cₜ)**
+   (persamaan 20).
+4. hₜ **bercabang dua**: naik ke atas sebagai keluaran waktu t, dan ke kanan sebagai
+   hₜ₋₁ untuk langkah berikutnya.
+
+**Fungsinya:** menentukan **bagian memori mana yang ditampilkan** sebagai keluaran
+saat ini. Tidak semua isi cₜ relevan untuk keluaran sekarang; sebagian cukup
+disimpan untuk dipakai nanti.
+""")
+    d.kode([
+        "Contoh angka (t = 2):",
+        f"  o₂ = σ(W_o × x₂ + U_o × h₁ + b_o) = σ({bt(p['W_o'])} × {X[1]} + {bt(p['U_o'])} × {a(s2['h_prev'])}"
+        f" + {bt(p['b_o'])}) = σ({a(s2['a_o'])}) = {a(s2['o'])}",
+        f"  tanh(c₂) = tanh({a(s2['c'])}) = {a(s2['tc'])}        (oval tanh, tanpa bobot)",
+        f"  h₂ = o₂ × tanh(c₂) = {a(s2['o'])} × {a(s2['tc'])} = {a(s2['h'])}",
+        "  t = 2 adalah langkah terakhir, jadi h₂ masuk ke lapisan dense (persamaan 21):",
+        f"  ŷ' = W_y × h₂ + b_y = {bt(p['W_y'])} × {a(s2['h'])} + {bt(p['b_y'])} = {a(lstm['maju']['yhat'])}",
+    ])
+
+    # 8 ---------------------------------------------------------------------
+    d.teks(f"## {JUDUL_1[8]}")
+    d.teks(f"Seluruh alur satu time step LSTM (contoh t = 2, memori masuk c₁ = {a(s2['c_prev'])} "
+           f"dan h₁ = {a(s2['h_prev'])}):")
+    d.tabel(["Urutan", "Gambar", "Perhitungan", "Hasil", "Makna"],
+            [["1. Forget", "Gambar 3", "f₂ = σ(a); f₂ × c₁", f"{a(s2['f'])}; {a(s2['f'] * s2['c_prev'])}",
+              f"{persen(s2['f'])} memori lama dipertahankan"],
+             ["2. Input", "Gambar 4", "i₂ = σ(a); c̃₂ = tanh(a); i₂ × c̃₂",
+              f"{a(s2['i'])}; {a(s2['cc'])}; {a(s2['i'] * s2['cc'])}", f"usulan baru masuk {persen(s2['i'])}"],
+             ["3. Update", "Gambar 5", "c₂ = f₂c₁ + i₂c̃₂", a(s2["c"]), "memori jangka panjang baru"],
+             ["4. Output", "Gambar 6", "o₂ = σ(a); h₂ = o₂ tanh(c₂)", f"{a(s2['o'])}; {a(s2['h'])}",
+              f"{persen(s2['o'])} memori yang sudah dimampatkan dikeluarkan"],
+             ["5. Dense", "-", "ŷ′ = W_y h₂ + b_y", a(lstm["maju"]["yhat"]), "prediksi (skala ternormalisasi)"]])
+    d.teks(f"""
+Prediksi ŷ′ = {a(lstm['maju']['yhat'])} masih jauh dari target {Y}. Seberapa salah
+prediksi ini dan bagaimana bobot diperbaiki dijelaskan di {tautan(2)} (konsep loss
+dan Adam) dan {tautan(3)} (perhitungan lengkapnya).
+""")
+
+    # 9 ---------------------------------------------------------------------
+    d.teks(f"## {JUDUL_1[9]}")
+    d.teks("""
+GRU **hanya punya satu garis memori**, yaitu hₜ (garis atas). Tidak ada cₜ
+terpisah dan tidak ada output gate. Gambar 7 dibaca dalam enam langkah berikut;
+contoh angkanya memakai time step t = 2 dari simulasi GRU mini.
+""")
+    d.teks(f"""
+**Langkah 0 — masukan.**
+
+- hₜ₋₁ masuk dari **kiri atas**, lalu bercabang: tetap di garis atas, turun lewat
+  garis vertikal kiri ke jalur bawah, dan bercabang ke tengah menuju lingkaran ×
+  milik rₜ.
+- xₜ masuk dari **bawah** ke jalur horizontal bawah.
+- Jalur bawah membawa hₜ₋₁ dan xₜ ke ketiga kotak kuning: σ (z), σ (r), dan tanh.
+- Contoh: h₁ = {a(g2['h_prev'])} (hasil t = 1) dan x₂ = {X[1]}.
+
+**Langkah 1 — update gate (kotak σ kiri) menghasilkan zₜ** (persamaan 23).
+
+- z₂ = σ(W_z × x₂ + U_z × h₁ + b_z(in) + b_z(rec)) = σ({a(g2['a_z'])}) = **{a(g2['z'])}**.
+- Panah zₜ naik dan **bercabang dua**: ke **lingkaran × kiri atas**, mengalikan
+  hₜ₋₁ menjadi z₂ × h₁ = {a(g2['z'])} × {a(g2['h_prev'])} = **{a(g2['z'] * g2['h_prev'])}**;
+  dan ke kanan menuju **lingkaran "1−"**, menghasilkan 1 − z₂ = **{a(1 - g2['z'])}**.
+
+**Langkah 2 — reset gate (kotak σ tengah) menghasilkan rₜ** (persamaan 24).
+
+- r₂ = σ(W_r × x₂ + U_r × h₁ + b_r(in) + b_r(rec)) = σ({a(g2['a_r'])}) = **{a(g2['r'])}**.
+- Panah rₜ naik ke **lingkaran × tengah**, tempat ia mengalikan memori lama yang datang
+  dari kiri.
+
+**Langkah 3 — kandidat (kotak tanh) menghasilkan h̃ₜ** (persamaan 25).
+
+- Cabang memori lama melewati lingkaran × milik rₜ sebelum masuk tanh. Pada Keras
+  (`reset_after=True`), yang dikalikan rₜ adalah bagian rekuren
+  qₜ = hₜ₋₁U_h + b_h(rec): q₂ = {bt(q['U_h'])} × {a(g2['h_prev'])} + {bt(q['b_h_rec'])} = {a(g2['q'])},
+  sehingga r₂ × q₂ = {a(g2['rq'])}.
+- xₜ masuk dari bawah: x₂W_h + b_h(in) = {bt(q['W_h'])} × {X[1]} + {bt(q['b_h_in'])} = {a(g2['masuk'])}.
+- h̃₂ = tanh({a(g2['masuk'])} + {a(g2['rq'])}) = tanh({a(g2['a_h'])}) = **{a(g2['hh'])}**.
+- Fungsi rₜ: menentukan **seberapa banyak masa lalu dipakai untuk menyusun usulan
+  baru**. rₜ mendekati 0 berarti kandidat disusun hampir hanya dari xₜ; rₜ mendekati 1
+  berarti masa lalu ikut diperhitungkan penuh. Pada t = 1, q₁ = 0 karena h₀ = 0, jadi
+  reset gate belum berpengaruh.
+
+**Langkah 4 — pencampuran** (persamaan 26).
+
+- h̃ₜ naik ke **lingkaran × kanan** dan dikalikan (1 − zₜ):
+  {a(1 - g2['z'])} × {a(g2['hh'])} = {a((1 - g2['z']) * g2['hh'])}.
+- Hasilnya naik ke **lingkaran +** dan dijumlahkan dengan zₜ × hₜ₋₁ dari kiri:
+  h₂ = {a(g2['z'] * g2['h_prev'])} + {a((1 - g2['z']) * g2['hh'])} = **{a(g2['h'])}**.
+
+**Langkah 5 — keluaran.** h₂ keluar ke **kanan** (ke langkah berikutnya) dan ke
+**atas** (keluaran waktu t). Karena t = 2 adalah langkah terakhir, h₂ masuk ke dense:
+ŷ′ = {bt(q['W_y'])} × {a(g2['h'])} + {bt(q['b_y'])} = **{a(gru['maju']['yhat'])}**.
+""")
+    d.teks(f"""
+**Fungsi utama zₜ:** zₜ bekerja seperti **penggeser (slider) pencampur**. zₜ mendekati 1
+berarti hₜ hampir sama dengan hₜ₋₁ (memori lama dipertahankan); zₜ mendekati 0 berarti hₜ
+hampir sama dengan h̃ₜ (diganti informasi baru). Porsi lama dan porsi baru **selalu
+berjumlah 1**. Pada contoh di atas: {persen(g2['z'])} memori lama + {persen(1 - g2['z'])}
+kandidat baru.
+""")
+    d.tabel(["Langkah", "Bagian Gambar 7", "Hasil (t = 2)"],
+            [["1. Update gate", "kotak σ kiri", f"z₂ = {a(g2['z'])}"],
+             ["2. Reset gate", "kotak σ tengah", f"r₂ = {a(g2['r'])}"],
+             ["3. Kandidat", "lingkaran × tengah, kotak tanh", f"r₂q₂ = {a(g2['rq'])}; h̃₂ = {a(g2['hh'])}"],
+             ["4. Pencampuran", "lingkaran × kiri, 1−, × kanan, +",
+              f"{a(g2['z'] * g2['h_prev'])} + {a((1 - g2['z']) * g2['hh'])} = {a(g2['h'])}"],
+             ["5. Dense", "-", f"ŷ′ = {a(gru['maju']['yhat'])}"]])
+
+    # 10 --------------------------------------------------------------------
+    d.teks(f"## {JUDUL_1[10]}")
+    d.tabel(["LSTM", "GRU", "Penjelasan"],
+            [["fₜ (forget) dan iₜ (input), **independen**", "zₜ dan (1 − zₜ), **terikat**",
+              "GRU menggabungkan keduanya menjadi satu update gate: menyimpan lebih banyak "
+              "yang lama berarti menerima lebih sedikit yang baru"],
+             ["cₜ dan hₜ (dua memori)", "hanya hₜ", "memori langsung disimpan di hidden state"],
+             ["oₜ (output gate)", "tidak ada", "seluruh hₜ langsung dikeluarkan"],
+             ["tidak ada padanan langsung", "rₜ (reset gate)", "mengatur peran masa lalu saat menyusun kandidat"],
+             ["jalur cell state (Gambar 2)", "jalur langsung zₜ ⊙ hₜ₋₁",
+              f"\"jalan tol gradien\"; pada simulasi, {persen(porsi_c)} (LSTM) dan {persen(porsi_z)} (GRU) "
+              "sinyal kesalahan mengalir lewat jalur ini"],
+             ["4 himpunan bobot (i, f, c, o)", "3 himpunan bobot (z, r, h)", "parameter GRU lebih sedikit"]])
+    nf = k["n_fitur"]
+    p_lstm = lambda n: 4 * (n * (n + nf) + n)
+    p_gru = lambda n: 3 * (n * (n + nf) + 2 * n)
+    nl, ng = k["lstm"]["neuron"], k["gru"]["neuron"]
+    assert p_lstm(nl) + nl + 1 == k["lstm"]["param"] and p_gru(ng) + ng + 1 == k["gru"]["param"]
+    d.teks(f"Jumlah parameter lapisan rekuren dengan {nf} fitur (persamaan 22 dan 27, tanpa dense):")
+    d.tabel(["Neuron n_u", f"LSTM: 4[n_u(n_u + {nf}) + n_u]", f"GRU: 3[n_u(n_u + {nf}) + 2n_u]"],
+            [[n, ribu(p_lstm(n)) + (" ← LSTM terbaik" if n == nl else ""),
+              ribu(p_gru(n)) + (" ← GRU terbaik" if n == ng else "")] for n in sorted({ng, nl})])
+    d.teks("Pada jumlah neuron yang sama, GRU selalu memerlukan parameter lebih sedikit.")
+
+    # 11 --------------------------------------------------------------------
+    d.teks(f"## {JUDUL_1[11]}")
+    d.teks("""
+1. **Klaim tentang rumus asli Cho et al. (2014) di halaman 17 perlu diperbaiki.**
+   Persamaan (7) pada makalah aslinya berbunyi
+   hⱼ⟨t⟩ = zⱼ hⱼ⟨t−1⟩ + (1 − zⱼ) h̃ⱼ⟨t⟩, yaitu **sama** dengan persamaan (26) (konvensi
+   Keras), sehingga peran zₜ **tidak tertukar**. Bentuk dengan peran zₜ tertukar,
+   hₜ = (1 − zₜ) ⊙ hₜ₋₁ + zₜ ⊙ h̃ₜ, berasal dari Chung et al. (2014). Perbedaan dengan
+   Cho et al. (2014) hanya pada posisi reset gate. Saran kalimat:
+
+   > Rumus GRU pada makalah asli Cho et al. (2014) sedikit berbeda, yaitu gerbang
+   > reset diterapkan sebelum perkalian dengan matriks bobot rekuren,
+   > h̃ₜ = tanh(xₜW_h + (rₜ ⊙ hₜ₋₁)U_h). Adapun bentuk
+   > hₜ = (1 − zₜ) ⊙ hₜ₋₁ + zₜ ⊙ h̃ₜ, dengan peran zₜ tertukar, digunakan oleh
+   > Chung et al. (2014).
+
+2. **Gambar 7 dan pengaturan `reset_after=True`.** Gambar 7 menggambar rₜ
+   mengalikan hₜ₋₁ sebelum kotak tanh (bentuk Cho et al.), sedangkan persamaan (25)
+   mengalikan rₜ dengan (hₜ₋₁U_h + b_h(rec)) setelah perkalian matriks. Fungsinya
+   sama, jadi gambar tidak perlu diubah. Cukup tambahkan kalimat berikut, atau beri
+   label garis dari lingkaran × rₜ ke kotak tanh dengan rₜ ⊙ (hₜ₋₁U_h + b_h(rec)) dan
+   garis xₜ ke kotak tanh dengan xₜW_h + b_h(in):
+
+   > Gambar 7 merupakan ilustrasi konseptual; urutan perhitungan yang digunakan
+   > mengikuti persamaan (25).
+
+3. **Notasi Cₜ pada Gambar 1-6.** Gambar Olah (2015) memakai huruf besar Cₜ untuk
+   cell state, sedangkan persamaan skripsi memakai cₜ. Satu kalimat penjelas dapat
+   mencegah pertanyaan penguji.
+""")
+    penutup(d, 1)
 
 
-# ----------------------- Model mini → model penelitian --------------------- #
-def bagian_6(d, k, lstm, gru):
-    d.teks(f"## {JUDUL[6]}")
+# ------------------------------- Bagian 2 ---------------------------------- #
+JUDUL_2 = {
+    1: "1. Gambaran Besar: Loss, Gradien, dan Adam",
+    2: "2. Kapan Dipakai: Alur Pelatihan di Penelitian",
+    3: "3. Fungsi Loss: Mean Squared Error",
+    4: "4. Membaca Kurva Loss",
+    5: "5. Hubungan MSE dengan RMSE dalam USD",
+    6: "6. Adam: Alur Satu Kali Update",
+    7: "7. Contoh Angka Adam: 1 Parameter, 2 Iterasi",
+    8: "8. Koreksi Bias Seiring Iterasi",
+    9: "9. Mengapa Adam Cocok untuk Penelitian Ini",
+    10: "10. Ringkasan: Kapan Loss dan Adam Bekerja",
+    11: "11. Catatan untuk Naskah Skripsi",
+}
+
+
+def adam_satu_parameter(theta, daftar_gradien):
+    """Jalankan Adam pada satu parameter; kembalikan rincian setiap iterasi."""
+    m = v = 0.0
+    hasil = []
+    for k_, g in enumerate(daftar_gradien, 1):
+        m = B1 * m + (1 - B1) * g
+        v = B2 * v + (1 - B2) * g * g
+        mh, vh = m / (1 - B1 ** k_), v / (1 - B2 ** k_)
+        langkah = LR * mh / (math.sqrt(vh) + EPS)
+        theta -= langkah
+        hasil.append({"g": g, "m": m, "v": v, "mh": mh, "vh": vh, "akar": math.sqrt(vh),
+                      "langkah": langkah, "theta": theta})
+    return hasil
+
+
+def seri_2_loss_adam(d, k, lstm):
+    kepala(d, 2)
+    d.teks(f"""
+{tautan(1)} menjelaskan apa yang terjadi di dalam sel saat prediksi dibuat
+(*forward pass*). Pada contoh model mini, prediksinya ŷ′ = {a(lstm['maju']['yhat'])}
+padahal targetnya {Y}. Bagian ini menjelaskan **bagaimana model belajar dari
+kesalahan itu**: fungsi loss mengukur kesalahan, gradien menunjukkan arah perbaikan,
+dan Adam menggeser bobot. Perhitungan lengkapnya untuk satu siklus ada di {tautan(3)}.
+""")
+    daftar_isi(d, JUDUL_2)
+    d.teks(CATATAN_ANGKA)
+
+    # 1 ---------------------------------------------------------------------
+    d.teks(f"## {JUDUL_2[1]}")
+    d.teks("""
+Pelatihan model bisa dibayangkan seperti **orang yang menuruni gunung dalam kabut**
+untuk mencari titik terendah:
+""")
+    d.tabel(["Komponen", "Analogi", "Tugasnya"],
+            [["**Fungsi loss (MSE)**", "ketinggian posisi saat ini",
+              "mengukur **seberapa salah** prediksi; makin kecil makin baik"],
+             ["**Gradien gₖ**", "kemiringan tanah di bawah kaki",
+              "menunjukkan **arah** perubahan bobot yang menaikkan loss; dihitung dengan "
+              "*backpropagation through time* (BPTT)"],
+             ["**Adam**", "strategi melangkah",
+              "memutuskan **seberapa jauh dan ke mana** setiap bobot digeser agar loss turun"]])
+    d.teks("""
+Urutannya selalu: **loss dihitung → gradien dihitung dari loss → Adam memakai
+gradien untuk memperbarui bobot**. Adam tidak menghitung gradien sendiri; ia hanya
+memakai gradien yang sudah ada.
+""")
+
+    # 2 ---------------------------------------------------------------------
+    total = {e: k["iter_epoch"] * e for e in sorted(k["lstm"]["per_epoch"])}
+    d.teks(f"## {JUDUL_2[2]}")
+    d.teks(f"""
+Di penelitian, data latih berisi **{ribu(k['n_latih'])} sampel** (jendela {k['lookback']} hari ×
+{k['n_fitur']} fitur) dengan **batch size {k['batch']}**. Jadi satu epoch terdiri dari
+⌈{ribu(k['n_latih'])} / {k['batch']}⌉ = **{k['iter_epoch']} batch**:
+{k['iter_epoch'] - 1} batch berisi {k['batch']} sampel dan 1 batch terakhir berisi
+{k['batch_akhir']} sampel. Untuk **setiap kombinasi neuron × epoch** pada grid
+(misalnya LSTM {k['lstm']['neuron']} neuron, {ribu(k['lstm']['epoch'])} epoch):
+
+**Langkah 0 — persiapan model.**
+
+- Bobot diisi acak (Glorot uniform untuk W, ortogonal untuk U); bias = 0 kecuali
+  bias forget LSTM = 1 ({tautan(4)}).
+- Memori Adam di-nol-kan: m₀ = 0, v₀ = 0, penghitung k = 0.
+
+**Langkah 1-5 — diulang untuk setiap batch**, berurutan secara kronologis karena
+`shuffle=False`:
+
+1. **Forward pass.** {k['batch']} jendela masuk ke LSTM/GRU lalu dense, menghasilkan
+   {k['batch']} prediksi ŷ′ (alur {tautan(1)}).
+2. **Hitung loss.** MSE dari {k['batch']} prediksi itu terhadap nilai aktual y′
+   (subbagian 3).
+3. **Hitung gradien.** BPTT menghasilkan gₖ untuk **setiap parameter**
+   ({ribu(k['lstm']['param'])} parameter pada LSTM-{k['lstm']['neuron']},
+   {ribu(k['gru']['param'])} pada GRU-{k['gru']['neuron']}).
+4. **Update Adam.** Setiap parameter digeser memakai persamaan (29)-(31) (subbagian 6).
+5. k bertambah 1, lalu lanjut ke batch berikutnya.
+
+**Langkah 6 — akhir setiap epoch.**
+
+- Keras mencatat **loss latih**, yaitu rata-rata loss dari {k['iter_epoch']} batch
+  selama epoch itu.
+- Keras menghitung **loss validasi** pada {k['n_val']} sampel validasi memakai bobot
+  akhir epoch. Ini **hanya diukur; tidak ada update bobot**.
+- Kedua angka inilah yang digambar sebagai **kurva loss** (subbagian 4).
+
+**Langkah 7 — setelah semua epoch selesai.**
+
+- Bobot pada **epoch terakhir** yang dipakai (penelitian tidak memakai *early stopping*).
+- Prediksi data validasi didenormalisasi ke USD, lalu **RMSE validasi** dipakai untuk
+  memilih kombinasi neuron × epoch terbaik: LSTM {k['lstm']['neuron']} neuron
+  {ribu(k['lstm']['epoch'])} epoch dan GRU {k['gru']['neuron']} neuron
+  {ribu(k['gru']['epoch'])} epoch.
+""")
+    d.teks("**Jumlah update Adam per model** ({} per epoch):".format(k["iter_epoch"]))
+    d.tabel(["Epoch", "Jumlah update"], [[ribu(e), f"{k['iter_epoch']} × {ribu(e)} = {ribu(t)}"]
+                                         for e, t in total.items()])
+    d.teks("""
+**Kapan loss dan Adam TIDAK dipakai:**
+
+- saat **memilih model terbaik** (dipakai RMSE validasi dalam USD);
+- saat **memprediksi data uji** (hanya forward pass, bobot sudah beku);
+- saat **evaluasi akhir** (RMSE, MAE, MAPE, akurasi arah dalam USD) dan **uji
+  Diebold-Mariano**.
+
+Singkatnya, **loss dan Adam hanya bekerja di fase pelatihan**.
+""")
+
+    # 3 ---------------------------------------------------------------------
+    d.teks(f"## {JUDUL_2[3]}")
+    d.teks(r"""
+Persamaan (28):
+
+$$\mathcal{L} = \frac{1}{N}\sum_{k=1}^{N}\left(y'_k - \hat{y}'_k\right)^2$$
+
+**Cara kerjanya**, dengan contoh 3 sampel:
+""")
+    aktual, prediksi = [0.50, 0.52, 0.55], [0.48, 0.53, 0.51]
+    selisih = [y_ - p_ for y_, p_ in zip(aktual, prediksi)]
+    mse = sum(s_ ** 2 for s_ in selisih) / len(selisih)
+    d.tabel(["Sampel", "Aktual y′", "Prediksi ŷ′", "Selisih", "Kuadrat"],
+            [[i + 1, f"{y_:.2f}", f"{p_:.2f}", f"{s_:.2f}", a(s_ ** 2, 4)]
+             for i, (y_, p_, s_) in enumerate(zip(aktual, prediksi, selisih))])
+    d.kode([f"MSE = ({' + '.join(a(s_ ** 2, 4) for s_ in selisih)}) / 3"
+            f" = {a(sum(s_ ** 2 for s_ in selisih), 4)} / 3 = {a(mse, 4)}"])
+    besar, kecil = max(abs(s_) for s_ in selisih), min(abs(s_) for s_ in selisih)
+    contoh_usd = 2500.0
+    norm_usd = contoh_usd / k["rentang"]
+    d.teks(f"""
+**Mengapa dikuadratkan?**
+
+1. Selisih positif dan negatif tidak saling meniadakan.
+2. Kesalahan besar dihukum jauh lebih berat: selisih {besar:.2f} menyumbang
+   {round((besar / kecil) ** 2)} kali lebih besar daripada selisih {kecil:.2f}, sehingga
+   model "dipaksa" menghindari meleset jauh.
+3. Fungsi kuadrat **mulus dan bisa diturunkan di semua titik**. Turunannya,
+   ∂L/∂ŷ′ = −2(y′ − ŷ′), menjadi titik awal BPTT ({tautan(3)}, subbagian 3.4). MAE
+   (nilai mutlak) tidak mulus di titik nol.
+
+**Mengapa dihitung pada skala ternormalisasi, bukan USD?** Harga Bitcoin bernilai
+puluhan ribu USD. Selisih {usd(contoh_usd)} USD jika dikuadratkan menjadi
+{usd(contoh_usd ** 2)}, sehingga gradien sangat besar dan pelatihan tidak stabil. Pada
+skala 0-1 selisih yang sama hanya {a(norm_usd)} dan kuadratnya {a(norm_usd ** 2)}.
+
+**Nilai N dalam praktik:**
+
+- saat pelatihan, N = {k['batch']} (ukuran batch; batch terakhir N = {k['batch_akhir']});
+- loss validasi dihitung pada N = {k['n_val']} sampel validasi;
+- pada model mini di {tautan(3)}, N = 1, sehingga
+  L = ({Y} − {a(lstm['maju']['yhat'])})² = {a(lstm['maju']['L'])}.
+""")
+
+    # 4 ---------------------------------------------------------------------
+    kl, kg = k["kurva"]["lstm"], k["kurva"]["gru"]
+    d.teks(f"## {JUDUL_2[4]}")
+    d.teks(f"""
+Kurva loss memperlihatkan loss latih dan loss validasi di akhir setiap epoch
+(langkah 6 pada subbagian 2). Berikut kurva model terbaik dari notebook:
+
+![Kurva loss LSTM terbaik]({k['gambar_loss_lstm']})
+
+![Kurva loss GRU terbaik]({k['gambar_loss_gru']})
+""")
+    nama_l = f"LSTM ({k['lstm']['neuron']} neuron, {ribu(k['lstm']['epoch'])} epoch)"
+    nama_g = f"GRU ({k['gru']['neuron']} neuron, {ribu(k['gru']['epoch'])} epoch)"
+    d.tabel(["Besaran", nama_l, nama_g],
+            [["Loss latih epoch 1", f"{kl['latih_awal']:.8f}", f"{kg['latih_awal']:.8f}"],
+             ["Loss latih epoch terakhir", f"{kl['latih_akhir']:.8f}", f"{kg['latih_akhir']:.8f}"],
+             ["Penurunan loss latih", persen(1 - kl["latih_akhir"] / kl["latih_awal"]),
+              persen(1 - kg["latih_akhir"] / kg["latih_awal"])],
+             ["Loss validasi epoch 1", f"{kl['val_awal']:.8f}", f"{kg['val_awal']:.8f}"],
+             ["Loss validasi epoch terakhir", f"{kl['val_akhir']:.8f}", f"{kg['val_akhir']:.8f}"],
+             ["Loss validasi minimum", f"{kl['val_min']:.8f} (epoch {kl['epoch_min']})",
+              f"{kg['val_min']:.8f} (epoch {kg['epoch_min']})"]])
+    d.teks(f"""
+**Cara membacanya:**
+
+- Jika **loss latih dan loss validasi turun bersama**, model sedang mempelajari pola
+  yang benar. Itu terlihat pada kedua model di awal pelatihan.
+- Jika **loss latih terus turun tetapi loss validasi naik**, itu tanda *overfitting*:
+  model mulai menghafal data latih.
+- Loss validasi LSTM mencapai minimum di epoch {kl['epoch_min']}, sangat dekat dengan
+  epoch terakhir. Loss validasi GRU mencapai minimum lebih awal, di epoch
+  {kg['epoch_min']}, lalu sedikit naik sampai epoch terakhir.
+
+**Mengapa jumlah epoch dipilih lewat data validasi?** RMSE validasi pada neuron terbaik
+untuk setiap jumlah epoch (Tabel 9 dan Tabel 11):
+""")
+    epochs = sorted(set(k["lstm"]["per_epoch"]) | set(k["gru"]["per_epoch"]))
+    d.tabel(["Epoch", f"LSTM {k['lstm']['neuron']} neuron (USD)", f"GRU {k['gru']['neuron']} neuron (USD)"],
+            [[ribu(e),
+              usd(k["lstm"]["per_epoch"][e]) + (" ← terbaik" if e == k["lstm"]["epoch"] else ""),
+              usd(k["gru"]["per_epoch"][e]) + (" ← terbaik" if e == k["gru"]["epoch"] else "")]
+             for e in epochs])
+    e_maks = max(epochs)
+    for m in ("lstm", "gru"):   # teks di bawah menyatakan epoch maksimum lebih buruk
+        assert k[m]["per_epoch"][e_maks] > k[m]["per_epoch"][k[m]["epoch"]]
+    d.teks(f"""
+Pada neuron terbaik, melatih sampai {ribu(e_maks)} epoch justru memperburuk RMSE
+validasi dibandingkan {ribu(k['lstm']['epoch'])} epoch. Pelatihan yang lebih lama tidak
+selalu lebih baik; kemungkinan besar model mulai terlalu menyesuaikan diri dengan data
+latih. Itulah gunanya data validasi untuk memilih jumlah epoch.
+""")
+
+    # 5 ---------------------------------------------------------------------
+    d.teks(f"## {JUDUL_2[5]}")
+    rmse_l = k["rentang"] * math.sqrt(k["val_loss_lstm"])
+    rmse_g = k["rentang"] * math.sqrt(k["val_loss_gru"])
+    assert abs(rmse_l / k["lstm"]["rmse_val"] - 1) < 1e-3
+    assert abs(rmse_g / k["gru"]["rmse_val"] - 1) < 1e-3
+    d.teks(f"""
+Karena normalisasi min-max bersifat linear (persamaan 6 dan 8), selisih dalam USD
+sama dengan selisih ternormalisasi dikali (x_max − x_min). Akibatnya:
+
+**RMSE (USD) = (x_max − x_min) × √MSE**
+
+Dengan rentang harga data latih {usd(k['x_max'])} − {usd(k['x_min'])} = {usd(k['rentang'])}
+dan loss validasi epoch terakhir dari notebook:
+""")
+    d.tabel(["Model", "Loss validasi (MSE)", "Rentang × √MSE", "RMSE validasi di tabel tuning"],
+            [["LSTM", f"{k['val_loss_lstm']:.8f}",
+              f"{usd(k['rentang'])} × {math.sqrt(k['val_loss_lstm']):.6f} = {usd(rmse_l)} USD",
+              f"{usd(k['lstm']['rmse_val'])} USD"],
+             ["GRU", f"{k['val_loss_gru']:.8f}",
+              f"{usd(k['rentang'])} × {math.sqrt(k['val_loss_gru']):.6f} = {usd(rmse_g)} USD",
+              f"{usd(k['gru']['rmse_val'])} USD"]])
+    d.teks("""
+Jadi **meminimalkan MSE saat pelatihan sama artinya dengan meminimalkan RMSE dalam
+USD** (selisih kecil hanya karena loss validasi dicetak 8 desimal). Kalimat ini
+berguna untuk menjawab pertanyaan "mengapa loss-nya MSE tetapi evaluasinya RMSE?".
+""")
+
+    # 6 ---------------------------------------------------------------------
+    d.teks(f"## {JUDUL_2[6]}")
+    d.teks(r"""
+Adam dijalankan **untuk setiap parameter secara terpisah**. Setiap bobot dan bias
+punya m dan v miliknya sendiri, sehingga setiap parameter punya "kecepatan belajar"
+sendiri. Satu kali update terdiri dari empat langkah:
+
+**Langkah A — momen pertama (persamaan 29, kiri)**
+
+$$m_k = \beta_1\, m_{k-1} + (1-\beta_1)\, g_k \qquad (\beta_1 = 0.9)$$
+
+Isinya adalah **rata-rata bergerak dari arah gradien**, kira-kira merangkum ±10
+gradien terakhir karena 1/(1 − 0.9) = 10. Fungsinya seperti **momentum bola yang
+menggelinding**: gradien dari satu batch bisa "berisik", dan dengan dirata-rata, arah
+langkah menjadi lebih stabil.
+
+**Langkah B — momen kedua (persamaan 29, kanan)**
+
+$$v_k = \beta_2\, v_{k-1} + (1-\beta_2)\, g_k^2 \qquad (\beta_2 = 0.999)$$
+
+Isinya adalah **rata-rata bergerak dari besarnya gradien (dikuadratkan)**, kira-kira
+merangkum ±1,000 gradien terakhir. Fungsinya **mengukur seberapa besar atau
+bergejolak gradien parameter itu**; nilainya dipakai sebagai pembagi di langkah D.
+
+**Langkah C — koreksi bias (persamaan 30)**
+
+$$\hat{m}_k = \frac{m_k}{1-\beta_1^k} \qquad \hat{v}_k = \frac{v_k}{1-\beta_2^k}$$
+
+m dan v dimulai dari **nol**, sehingga di awal pelatihan nilainya "tertarik" ke nol.
+Pembagi (1 − βᵏ) mengoreksinya, dan pengaruhnya hilang setelah banyak iterasi
+(subbagian 8).
+
+**Langkah D — update parameter (persamaan 31)**
+
+$$\theta_k = \theta_{k-1} - \eta\,\frac{\hat{m}_k}{\sqrt{\hat{v}_k}+\epsilon}
+\qquad (\eta = 0.001,\ \epsilon = 10^{-7})$$
+
+- Pembilang m̂ₖ menentukan **arah** langkah.
+- Pembagi √v̂ₖ menyesuaikan **ukuran langkah**: parameter yang gradiennya besar atau
+  bergejolak mendapat langkah lebih kecil, sedangkan yang gradiennya kecil mendapat
+  langkah relatif lebih besar.
+- Tanda minus berarti bergerak **berlawanan** arah gradien, yaitu menuruni loss.
+- η = 0.001 adalah batas kasar ukuran langkah. Rasio m̂/√v̂ biasanya sekitar ±1, jadi
+  setiap parameter bergeser paling jauh sekitar ±0.001 per iterasi.
+- ε hanya pengaman agar tidak terjadi pembagian dengan nol.
+""")
+    d.teks(f"Penerapan keempat langkah ini pada 14 parameter model mini ada di "
+           f"{tautan(3)}, subbagian 3.10 sampai 3.12.")
+
+    # 7 ---------------------------------------------------------------------
+    d.teks(f"## {JUDUL_2[7]}")
+    theta0, gradien = 0.5, [0.2, 0.1]
+    h = adam_satu_parameter(theta0, gradien)
+    h100 = adam_satu_parameter(theta0, [100 * g for g in gradien])
+    assert all(abs(x["langkah"] - y["langkah"]) < 1e-8 for x, y in zip(h, h100))
+    d.teks(f"Misalkan satu bobot bernilai awal θ₀ = {theta0}, dengan gradien iterasi 1 "
+           f"g₁ = {gradien[0]} dan iterasi 2 g₂ = {gradien[1]}:")
+    i1, i2 = h
+    d.tabel(["Tahap", f"Iterasi 1 (g = {gradien[0]})", f"Iterasi 2 (g = {gradien[1]})"],
+            [["m = 0.9 m_lama + 0.1 g", f"0.9 × 0 + 0.1 × {gradien[0]} = {a(i1['m'])}",
+              f"0.9 × {a(i1['m'])} + 0.1 × {gradien[1]} = {a(i2['m'])}"],
+             ["v = 0.999 v_lama + 0.001 g²", f"0.001 × {gradien[0]}² = {a(i1['v'], 8)}",
+              f"0.999 × {a(i1['v'], 8)} + 0.001 × {gradien[1]}² = {a(i2['v'], 8)}"],
+             ["m̂ = m / (1 − 0.9ᵏ)", f"{a(i1['m'])} / 0.1 = {a(i1['mh'])}",
+              f"{a(i2['m'])} / 0.19 = {a(i2['mh'])}"],
+             ["v̂ = v / (1 − 0.999ᵏ)", f"{a(i1['v'], 8)} / 0.001 = {a(i1['vh'])}",
+              f"{a(i2['v'], 8)} / 0.001999 = {a(i2['vh'])}"],
+             ["√v̂", a(i1["akar"]), a(i2["akar"])],
+             ["Langkah η × m̂ / (√v̂ + ε)", f"0.001 × {a(i1['mh'])} / {a(i1['akar'])} = {a(i1['langkah'], 7)}",
+              f"0.001 × {a(i2['mh'])} / {a(i2['akar'])} = {a(i2['langkah'], 7)}"],
+             ["θ baru = θ lama − langkah", f"{theta0} − {a(i1['langkah'], 7)} = {a(i1['theta'])}",
+              f"{a(i1['theta'])} − {a(i2['langkah'], 7)} = {a(i2['theta'])}"]])
+    d.teks(f"""
+**Bukti "tidak dipengaruhi penskalaan gradien".** Jika gradiennya **100 kali lebih
+besar** (g₁ = {100 * gradien[0]:g}, g₂ = {100 * gradien[1]:g}), langkahnya tetap
+**{a(h100[0]['langkah'], 7)} dan {a(h100[1]['langkah'], 7)}**, sama persis. Rasio m̂/√v̂
+menghapus skala gradien. Sebagai pembanding, SGD biasa (langkah = η × g) akan melangkah
+100 kali lebih jauh.
+""")
+
+    # 8 ---------------------------------------------------------------------
+    d.teks(f"## {JUDUL_2[8]}")
+    d.teks("""
+Pembagi koreksi bias makin lama makin mendekati 1, sehingga pengaruhnya hilang.
+Koreksi m hanya penting di epoch pertama, sedangkan koreksi v masih berpengaruh
+sampai puluhan epoch (angka epoch memakai 26 iterasi per epoch penelitian):
+""")
+    titik = ((1, "iterasi pertama"), (2, "iterasi kedua"),
+             (k["iter_epoch"], "akhir epoch 1"), (1000, f"± epoch {round(1000 / k['iter_epoch'])}"),
+             (k["iter_epoch"] * 100, "akhir epoch 100"), (k["iter_epoch"] * 500, "akhir epoch 500"))
+    d.tabel(["Iterasi k", "Keterangan", "1 − 0.9ᵏ (pembagi m)", "1 − 0.999ᵏ (pembagi v)"],
+            [[ribu(kk), ket, a(1 - B1 ** kk), a(1 - B2 ** kk)] for kk, ket in titik])
+
+    # 9 ---------------------------------------------------------------------
+    d.teks(f"## {JUDUL_2[9]}")
+    d.teks(f"""
+- Adam menggabungkan dua ide: **momentum** (dari m) dan **langkah adaptif per
+  parameter** (dari v, ide RMSProp/AdaGrad; Kingma & Ba, 2015).
+- Gradien dari batch data kripto yang fluktuatif cenderung berisik; momentum
+  meredamnya.
+- Parameter LSTM/GRU sangat beragam (bobot gerbang, bobot kandidat, bias, dense).
+  Langkah adaptif membuat semuanya bisa belajar dengan kecepatan wajar tanpa harus
+  mengatur learning rate satu per satu. Di {tautan(3)} terlihat gradien terbesar dan
+  terkecil berbeda ratusan sampai ribuan kali, tetapi semua parameter tetap bergeser
+  ±0.001 pada iterasi pertama.
+- Pengaturan Adam **identik** untuk LSTM dan GRU (η = {k['lr']:g}, β₁ = {B1}, β₂ = {B2},
+  ε = 10⁻⁷, batch {k['batch']}, seed sama), sehingga perbedaan hasil hanya berasal dari
+  arsitektur.
+""")
+
+    # 10 --------------------------------------------------------------------
+    d.teks(f"## {JUDUL_2[10]}")
+    d.tabel(["Tahap penelitian", "Loss MSE", "Adam"],
+            [["Inisialisasi model", "-", "m = 0, v = 0, k = 0"],
+             [f"Setiap batch latih ({k['iter_epoch']}× per epoch)", "dihitung, menjadi sumber gradien",
+              "memperbarui semua bobot dan bias"],
+             ["Akhir setiap epoch", "loss latih dan loss validasi dicatat (kurva loss)",
+              "tidak ada update dari data validasi"],
+             ["Pemilihan neuron dan epoch terbaik", "tidak (memakai RMSE validasi USD, setara √MSE × rentang)",
+              "tidak"],
+             ["Prediksi data uji dan evaluasi", "tidak", "tidak (bobot sudah beku)"]])
+
+    # 11 --------------------------------------------------------------------
+    d.teks(f"## {JUDUL_2[11]}")
+    d.teks(f"""
+1. **Keterangan N pada persamaan (28).** Saat pelatihan, loss dihitung per
+   *mini-batch*, jadi N = {k['batch']} (batch terakhir {k['batch_akhir']}), bukan seluruh
+   sampel. Saran kalimat:
+
+   > Saat pelatihan, ℒ dihitung pada setiap mini-batch berukuran N = {k['batch']},
+   > sedangkan loss yang dilaporkan per epoch merupakan rata-rata loss seluruh
+   > mini-batch.
+
+2. **Arti iterasi ke-k pada Adam.** Satu iterasi adalah satu kali update per batch,
+   bukan per epoch. Saran kalimat:
+
+   > Satu iterasi k bersesuaian dengan satu mini-batch, sehingga dengan
+   > {ribu(k['n_latih'])} sampel latih dan batch size {k['batch']} terdapat
+   > {k['iter_epoch']} iterasi per epoch.
+
+3. **Opsional, hubungan loss dan evaluasi** (subbab 1.5.11 atau 1.5.12):
+
+   > Karena normalisasi min-max bersifat linear, RMSE dalam USD sama dengan
+   > (x_max − x_min) × √MSE, sehingga meminimalkan MSE pada skala ternormalisasi
+   > setara dengan meminimalkan RMSE dalam USD.
+""")
+    penutup(d, 2)
+
+
+def bagian_5(d, k, lstm, gru):
+    d.teks(f"## {JUDUL[5]}")
     nl, ng = k["lstm"]["neuron"], k["gru"]["neuron"]
     d.tabel(["Aspek", "Model mini", "Model penelitian"],
             [["Masukan per time step", "1 angka", f"vektor {k['n_fitur']} fitur"],
@@ -1456,8 +2084,8 @@ def bagian_6(d, k, lstm, gru):
               f"{ribu(k['iter_epoch'] * k['lstm']['epoch'])}"]])
     d.teks("""
 Yang sama: urutan forward → loss → BPTT → Adam, rumus setiap langkah, dan
-pengaturan Adam. Setiap parameter (termasuk setiap elemen matriks) punya
-gradien, m, dan v sendiri.
+pengaturan Adam. Setiap parameter (termasuk setiap elemen matriks) punya gradien,
+m, dan v sendiri.
 """)
 
     s_lstm = lstm["maju"]["langkah"][-1]["h"]
@@ -1465,7 +2093,7 @@ gradien, m, dan v sendiri.
     h2b, y2b = 0.30, 0.65
     yh2 = LSTM_AWAL["W_y"] * h2b + LSTM_AWAL["b_y"]
     d1, d2 = -(2 / 2) * (Y - y_lstm), -(2 / 2) * (y2b - yh2)
-    d.teks("### 6.1 Jika Memakai Batch (N > 1)")
+    d.teks("### 5.1 Jika Memakai Batch (N > 1)")
     d.teks(r"""
 Persamaan (28) memakai rata-rata $\mathcal{L} = \frac{1}{N}\sum_k (y'_k - \hat{y}'_k)^2$.
 Setiap $\hat{y}'_k$ hanya muncul di suku ke-$k$, sehingga:
@@ -1483,11 +2111,12 @@ sendiri, lalu gradien semua sampel dijumlahkan sebelum Adam dipanggil sekali.
         f"  ŷ'₁ = {a(y_lstm)},   ŷ'₂ = 0.8 × 0.30 + 0 = {a(yh2)}",
         f"  ∂L/∂ŷ'₁ = -(2/2) × ({Y} - {a(y_lstm)}) = {a(d1)}",
         f"  ∂L/∂ŷ'₂ = -(2/2) × ({y2b} - {a(yh2)}) = {a(d2)}",
-        f"  ∂L/∂W_y = {kr(d1)} × {a(s_lstm)} + {kr(d2)} × {h2b} = {kr(d1 * s_lstm)} + {kr(d2 * h2b)} = {a(d1 * s_lstm + d2 * h2b)}",
+        f"  ∂L/∂W_y = {kr(d1)} × {a(s_lstm)} + {kr(d2)} × {h2b} = {kr(d1 * s_lstm)} + {kr(d2 * h2b)}"
+        f" = {a(d1 * s_lstm + d2 * h2b)}",
         f"  ∂L/∂b_y = {kr(d1)} + {kr(d2)} = {a(d1 + d2)}",
     ])
 
-    d.teks("### 6.2 Versi Vektor pada Lapisan Dense")
+    d.teks("### 5.2 Versi Vektor pada Lapisan Dense")
     d.teks(f"""
 Pada model penelitian, h_T berisi n_u elemen dan W_y juga berisi n_u elemen,
 sehingga ŷ′ = Σⱼ h_T,ⱼ·W_y,ⱼ + b_y. Rumus 3.4 berlaku untuk setiap elemen j:
@@ -1495,40 +2124,24 @@ sehingga ŷ′ = Σⱼ h_T,ⱼ·W_y,ⱼ + b_y. Rumus 3.4 berlaku untuk setiap el
 yaitu **{nl + 1} parameter dense pada LSTM** dan **{ng + 1} pada GRU** (suku
 (n_u + 1) pada persamaan 22 dan 27). Sinyal yang masuk ke neuron j adalah
 ∂L/∂h_T,ⱼ = ∂L/∂ŷ′·W_y,ⱼ.
+
+Hubungan loss MSE dengan RMSE dalam USD dibahas di {tautan(2, JUDUL_2[5])}.
 """)
 
-    d.teks("### 6.3 Hubungan Loss MSE dengan RMSE dalam USD")
-    rmse_l = k["rentang"] * math.sqrt(k["val_loss_lstm"])
-    rmse_g = k["rentang"] * math.sqrt(k["val_loss_gru"])
-    assert abs(rmse_l / k["lstm"]["rmse_val"] - 1) < 1e-3
-    assert abs(rmse_g / k["gru"]["rmse_val"] - 1) < 1e-3
+    d.teks("### 5.3 Batasan Simulasi Ini")
     d.teks(f"""
-Karena normalisasi min-max bersifat linear, RMSE dalam USD = (x_max − x_min) × √MSE.
-Dengan rentang harga data latih {usd(k['x_max'])} − {usd(k['x_min'])} = {usd(k['rentang'])}
-dan loss validasi epoch terakhir dari notebook:
-""")
-    d.tabel(["Model", "Loss validasi (MSE)", "Rentang × √MSE", "RMSE validasi di tabel tuning"],
-            [["LSTM", f"{k['val_loss_lstm']:.8f}", f"{usd(rmse_l)} USD", f"{usd(k['lstm']['rmse_val'])} USD"],
-             ["GRU", f"{k['val_loss_gru']:.8f}", f"{usd(rmse_g)} USD", f"{usd(k['gru']['rmse_val'])} USD"]])
-    d.teks("""
-Jadi meminimalkan MSE saat pelatihan sama artinya dengan meminimalkan RMSE dalam
-USD (selisih kecil hanya karena loss validasi dicetak 8 desimal).
-""")
-
-    d.teks("### 6.4 Batasan Simulasi Ini")
-    d.teks(f"""
-1. Loss simulasi turun hampir ke nol karena hanya ada **1 sampel**, sehingga
-   model bisa "menghafal" targetnya. Pada data penelitian dengan
-   {ribu(k['n_latih'])} sampel, loss validasi LSTM terbaik berhenti di sekitar
-   {k['val_loss_lstm']:.5f} karena model harus menemukan pola umum, bukan menghafal.
-2. Angka akhir simulasi **tidak dapat dipakai untuk membandingkan** LSTM dan
-   GRU. Bobot awalnya dipilih bulat agar mudah dihitung, sedangkan Keras
-   memakai bobot acak. Perbandingan yang sah tetap hasil tahap 9-12.
+1. Loss simulasi turun hampir ke nol karena hanya ada **1 sampel**, sehingga model
+   bisa "menghafal" targetnya. Pada data penelitian dengan {ribu(k['n_latih'])}
+   sampel, loss validasi LSTM terbaik berhenti di sekitar {k['val_loss_lstm']:.5f}
+   karena model harus menemukan pola umum, bukan menghafal.
+2. Angka akhir simulasi **tidak dapat dipakai untuk membandingkan** LSTM dan GRU.
+   Bobot awalnya dipilih bulat agar mudah dihitung, sedangkan Keras memakai bobot
+   acak. Perbandingan yang sah tetap hasil tahap 9-12.
 """)
 
 
-def bagian_7(d, k, lstm, gru, cek):
-    d.teks(f"## {JUDUL[7]}")
+def bagian_6(d, k, lstm, gru, cek):
+    d.teks(f"## {JUDUL[6]}")
     ll, lg = lstm["latih"], gru["latih"]
     d.kode([
         "SATU SIKLUS PELATIHAN (berlaku untuk LSTM dan GRU)",
@@ -1550,11 +2163,250 @@ def bagian_7(d, k, lstm, gru, cek):
         f"  GRU : loss {a(lg['L'][0])} → {a(lg['L'][1])} (k = 1) → {fl(lg['L'][-1])} (k = {ITERASI}),"
         f" ŷ' {a(lg['yhat'][0])} → {a(lg['yhat'][-1])}",
     ])
-    d.teks("**Pemeriksaan otomatis yang lolos saat berkas ini dibuat:**")
+    d.teks("**Pemeriksaan otomatis yang lolos saat seri ini dibuat:**")
     d.teks("\n".join(f"- {c}" for c in cek))
+    penutup(d, 3)
+
+
+# ------------------------------- Bagian 4 ---------------------------------- #
+JUDUL_4 = {
+    1: "1. Intinya",
+    2: "2. Mengapa Bias Diperlukan",
+    3: "3. Cara Menghitung Bias Langkah demi Langkah",
+    4: "4. Dua Bias pada GRU: Asal dan Buktinya",
+    5: "5. Catatan untuk Naskah Skripsi",
+}
+
+
+def seri_4_bias(d, k, lstm, gru):
+    gl, gg = lstm["mundur"]["g"], gru["mundur"]["g"]
+    rl = lstm["mundur"]["rincian"]
+    kepala(d, 4)
+    d.teks(f"""
+Bagian ini mengumpulkan semua pembahasan tentang **bias**: mengapa bias perlu ada di
+LSTM dan GRU, bagaimana bias dihitung langkah demi langkah, dan mengapa GRU memiliki
+dua jenis bias. Angka contohnya diambil dari simulasi di {tautan(3)} dan dari model
+terlatih penelitian.
+""")
+    daftar_isi(d, JUDUL_4)
+    d.teks(CATATAN_ANGKA)
+
+    # 1 ---------------------------------------------------------------------
+    d.teks(f"## {JUDUL_4[1]}")
+    d.teks("""
+Bias adalah **titik awal (intercept)** setiap gerbang dan neuron, sama seperti
+intercept *a* pada regresi y = a + bx. Bobot hanya bisa *mengalikan* masukan. Tanpa
+bias, ketika masukannya nol, setiap gerbang dipaksa bernilai tetap (σ(0) = 0.5, selalu
+setengah terbuka; tanh(0) = 0). Dengan bias, setiap gerbang dapat menentukan **posisi
+bawaannya sendiri**.
+
+Bias tidak dihitung dengan satu rumus langsung. Bias **dipelajari** lewat siklus yang
+sama dengan bobot: forward → loss → BPTT → Adam (subbagian 3).
+""")
+
+    # 2 ---------------------------------------------------------------------
+    d.teks(f"## {JUDUL_4[2]}")
+    d.teks("""
+**(a) Tanpa bias, gerbang terkunci di σ(0) = 0.5 saat masukannya nol.** Ini sering
+terjadi di penelitian: h₀ = 0 di awal setiap jendela 7 hari, dan normalisasi min-max
+membuat fitur bernilai dekat 0 ketika nilainya mendekati minimum data latih.
+
+**(b) Bias menggeser ambang buka-tutup gerbang.** Pada σ(W·x + b), bobot W mengatur
+kecuraman kurva, bias b mengatur posisinya (gerbang = 0.5 saat x = −b/W). Contoh satu
+fitur ternormalisasi x ∈ [0, 1] dengan W = 5:
+""")
+    d.tabel(["x", "Dengan bias: σ(5x − 2.5)", "Tanpa bias: σ(5x)"],
+            [[f"{x:g}", a(sig(5 * x - 2.5), 3), a(sig(5 * x), 3)] for x in (0, 0.25, 0.5, 0.75, 1)])
+    d.teks("""
+Tanpa bias, gerbang **tidak pernah turun di bawah 0.5** untuk data ternormalisasi
+yang positif, sehingga model tidak bisa menyatakan aturan "tutup gerbang saat nilai
+fitur rendah, buka saat tinggi".
+
+**(c) Bias menentukan perilaku bawaan setiap gerbang.** Contoh terpenting: forget gate
+LSTM. Jika gerbang hanya ditentukan oleh biasnya, sisa memori setelah 7 hari adalah f⁷:
+""")
+    bf = k["bias_lstm"]["f"]
+    d.tabel(["Bias forget", "f = σ(b)", "Memori tersisa setelah 7 hari (f⁷)"],
+            [[lbl, a(sig(b), 3), persen(sig(b) ** 7)]
+             for lbl, b in (("0 (tanpa bias)", 0.0), (f"{a(bf)} (neuron ke-1 LSTM terlatih)", bf),
+                            ("1 (inisialisasi Keras)", 1.0), ("2", 2.0))])
+    d.teks("""
+Tanpa bias, memori langsung susut separuh setiap hari. Itulah alasan Keras mengisi
+**b_f = 1** di awal pelatihan (*unit forget bias*).
+
+Nilai bawaan gerbang pada **model terlatih penelitian** (neuron ke-1, saat kontribusi
+xW + hU = 0), dibaca dari `tahap_7_forward_pass_lstm.md` dan
+`tahap_8_forward_pass_gru.md`:
+""")
+    bl, bg = k["bias_lstm"], k["bias_gru"]
+    d.tabel(["Model", "Gerbang", "Bias", "Nilai bawaan", "Arti"],
+            [["LSTM", "input i", a(bl["i"]), f"σ = {a(sig(bl['i']), 3)}", "cenderung hemat menerima informasi baru"
+              if sig(bl["i"]) < 0.5 else "cenderung menerima informasi baru"],
+             ["LSTM", "forget f", a(bl["f"]), f"σ = {a(sig(bl['f']), 3)}", "cenderung mempertahankan memori"
+              if sig(bl["f"]) > 0.5 else "cenderung membuang memori"],
+             ["LSTM", "kandidat c̃", a(bl["c"]), f"tanh = {a(math.tanh(bl['c']), 3)}", "isi bawaan hampir netral"
+              if abs(bl["c"]) < 0.1 else "isi bawaan tidak netral"],
+             ["LSTM", "output o", a(bl["o"]), f"σ = {a(sig(bl['o']), 3)}", "cenderung menahan sebagian keluaran"
+              if sig(bl["o"]) < 0.5 else "cenderung mengeluarkan memori"],
+             ["GRU", "update z", f"{a(bg['z'][0])} + {kr(bg['z'][1])}", f"σ = {a(sig(sum(bg['z'])), 3)}",
+              f"cenderung mempertahankan {persen(sig(sum(bg['z'])), 0)} memori lama"],
+             ["GRU", "reset r", f"{a(bg['r'][0])} + {kr(bg['r'][1])}", f"σ = {a(sig(sum(bg['r'])), 3)}",
+              f"memakai sekitar {persen(sig(sum(bg['r'])), 0)} masa lalu untuk kandidat"]])
+    d.teks(f"""
+Nilai ini hanya **titik awal**. Nilai gerbang sebenarnya berubah setiap hari sesuai
+xₜW + hₜ₋₁U; bias menentukan dari mana perubahan itu dimulai.
+
+**(d) Bias dense menggeser tingkat dasar prediksi.** h_T selalu berada di rentang
+(−1, 1), jadi b_y yang menentukan "tingkat dasar" prediksi dan W_y cukup menangani
+variasinya. Pada model terlatih, b_y LSTM = {a(k['by_lstm'])} (setara
+{a(k['by_lstm'])} × {usd(k['rentang'])} ≈ **{usd(k['by_lstm'] * k['rentang'])} USD**) dan
+b_y GRU = {a(k['by_gru'])} (≈ **{usd(k['by_gru'] * k['rentang'])} USD**). Tanpa b_y,
+prediksi dipaksa jatuh ke harga terendah data latih ({usd(k['x_min'])} USD) setiap kali
+h_T = 0.
+
+**(e) Bias selalu menerima sinyal belajar.** ∂L/∂W = Σ δ·x dan ∂L/∂U = Σ δ·hₜ₋₁
+bernilai nol bila masukannya nol (lihat ∂L/∂U di {tautan(3)}, subbagian 3.8: pada t = 1
+tidak ada kontribusi karena h₀ = 0), sedangkan ∂L/∂b = Σ δ tidak dikalikan apa pun.
+
+**(f) Biayanya kecil.** Pada model penelitian, bias hanya
+{4 * k['lstm']['neuron'] + 1} dari {ribu(k['lstm']['param'])} parameter LSTM
+({persen((4 * k['lstm']['neuron'] + 1) / k['lstm']['param'])}) dan
+{6 * k['gru']['neuron'] + 1} dari {ribu(k['gru']['param'])} parameter GRU
+({persen((6 * k['gru']['neuron'] + 1) / k['gru']['param'])}).
+""")
+
+    # 3 ---------------------------------------------------------------------
+    d.teks(f"## {JUDUL_4[3]}")
+    d.teks(f"""
+Bias diperlakukan **persis seperti bobot**. Berikut lima langkahnya, dengan rujukan ke
+perhitungan di {tautan(3)}:
+""")
+    lat = lstm["latih"]
+    d.kode([
+        "Langkah 1 — Nilai awal (Bagian 3: 3.1 dan 4.1)",
+        "  Bias gerbang = 0, kecuali bias forget gate LSTM = 1. Bias dense b_y = 0.",
+        "",
+        "Langkah 2 — Dipakai di forward pass (Bagian 3: 3.2 dan 4.2)",
+        "  Gerbang : a = W × x + U × h + b",
+        "  Dense   : ŷ' = W_y × h_T + b_y",
+        "",
+        "Langkah 3 — Hitung gradiennya (Bagian 3: 3.8 dan 4.8)",
+        "  Karena a = W × x + U × h + b, maka ∂a/∂b = 1, sehingga",
+        "  ∂L/∂b = δ × 1 = δ, dijumlahkan untuk semua time step:  ∂L/∂b = Σ δ",
+        f"  Contoh b_y : ∂L/∂b_y = ∂L/∂ŷ' × 1 = {a(gl['b_y'])}",
+        f"  Contoh b_c : ∂L/∂b_c = δc̃₁ + δc̃₂ = {kr(rl[0]['delta_c'])} + {kr(rl[1]['delta_c'])} = {a(gl['b_c'])}",
+        "",
+        "Langkah 4 — Update dengan Adam (Bagian 3: 3.10 dan 3.12)",
+        f"  b_y: 0 → {a(lat['p'][1]['b_y'])} (k = 1) → {a(lat['p'][2]['b_y'])} (k = 2)",
+        "",
+        "Langkah 5 — Ulangi siklus (Bagian 3: 3.13)",
+        f"  Setelah {ITERASI} iterasi b_y = {a(lat['p'][-1]['b_y'])}. Pada model penelitian, b_y LSTM = {a(k['by_lstm'])}",
+        f"  adalah hasil akhir proses yang sama setelah {ribu(k['iter_epoch'] * k['lstm']['epoch'])} iterasi.",
+    ])
+    d.teks("Ringkasan rumus gradien seluruh bias pada simulasi (iterasi k = 1):")
+    d.tabel(["Bias", "Rumus gradien", "Nilai pada simulasi"],
+            [["Dense b_y (LSTM)", "∂L/∂ŷ′", a(gl["b_y"])],
+             ["LSTM b_f", "δf₁ + δf₂", a(gl["b_f"])],
+             ["LSTM b_i", "δi₁ + δi₂", a(gl["b_i"])],
+             ["LSTM b_c", "δc̃₁ + δc̃₂", a(gl["b_c"])],
+             ["LSTM b_o", "δo₁ + δo₂", a(gl["b_o"])],
+             ["Dense b_y (GRU)", "∂L/∂ŷ′", a(gg["b_y"])],
+             ["GRU b_z(in) dan b_z(rec)", "keduanya δz₁ + δz₂", f"{a(gg['b_z_in'])} dan {a(gg['b_z_rec'])}"],
+             ["GRU b_r(in) dan b_r(rec)", "keduanya δr₁ + δr₂", f"{a(gg['b_r_in'])} dan {a(gg['b_r_rec'])}"],
+             ["GRU b_h(in)", "δh̃₁ + δh̃₂", a(gg["b_h_in"])],
+             ["GRU b_h(rec)", "δh̃₁·r₁ + δh̃₂·r₂", a(gg["b_h_rec"])]])
+
+    # 4 ---------------------------------------------------------------------
+    d.teks(f"## {JUDUL_4[4]}")
+    d.teks(f"""
+**Letaknya pada Gambar 7** ({tautan(1, JUDUL_1[9])}). Bias tidak digambar; bias berada
+di dalam setiap kotak kuning (σ, σ, tanh). Setiap kotak menerima dua garis masuk,
+yaitu xₜ dari bawah dan hₜ₋₁ dari garis vertikal kiri. Dengan `reset_after=True`, Keras
+menghitung kedua garis itu terpisah, masing-masing dengan biasnya sendiri: garis xₜ
+membawa **bias masukan** (xₜW + b(in)) dan garis hₜ₋₁ membawa **bias rekuren**
+(hₜ₋₁U + b(rec)).
+""")
+    d.kode("""
+Kotak σ untuk z (dan r, sama persis): kedua cabang langsung dijumlahkan
+  h_(t-1) ──► h_(t-1) × U_z + b_z(rec) ──┐
+                                         (+) ──► σ ──► z_t
+  x_t ─────► x_t × W_z + b_z(in) ────────┘
+
+Kotak tanh untuk kandidat: cabang h_(t-1) melewati lingkaran × milik r_t dulu
+  h_(t-1) ──► h_(t-1) × U_h + b_h(rec) ──► (× r_t) ──┐
+                                                     (+) ──► tanh ──► h̃_t
+  x_t ─────► x_t × W_h + b_h(in) ─────────────────────┘
+""")
+    akhir = gru["latih"]["p"][-1]
+    d.teks(f"""
+**Pada z dan r, dua bias sebenarnya berlebih.** b(in) + b(rec) langsung dijumlahkan,
+jadi gradien keduanya selalu sama. Karena nilai awalnya juga sama (0), keduanya akan
+selalu kembar:
+
+- simulasi: setelah {ITERASI} iterasi, b_z(in) = b_z(rec) = {a(akhir['b_z_in'])} dan
+  b_r(in) = b_r(rec) = {a(akhir['b_r_in'])};
+- model GRU terlatih penelitian (neuron ke-1): b_z(in) = {a(bg['z'][0])},
+  b_z(rec) = {a(bg['z'][1])}; b_r(in) = {a(bg['r'][0])}, b_r(rec) = {a(bg['r'][1])}.
+
+**Pada kandidat, dua bias berbeda peran.** b_h(rec) ikut dikalikan rₜ (jika rₜ
+mendekati 0, bias ini ikut "dimatikan" bersama memori lama), sedangkan b_h(in) selalu
+aktif. Gradiennya berbeda (Σ δh̃·r vs Σ δh̃), sehingga nilainya juga berbeda:
+
+- simulasi: gradien {a(gg['b_h_in'])} vs {a(gg['b_h_rec'])}; setelah {ITERASI} iterasi
+  b_h(in) = {a(akhir['b_h_in'])} dan b_h(rec) = {a(akhir['b_h_rec'])};
+- model terlatih (neuron ke-1): b_h(in) = {a(bg['h'][0])} dan b_h(rec) = {a(bg['h'][1])}.
+
+**Asal-usulnya.** Persamaan asli Cho et al. (2014) tidak memuat bias sama sekali
+(penulisnya menyebut *"to make the equations uncluttered, we omit biases"*). Bentuk
+dua bias berasal dari implementasi GRU pada pustaka **NVIDIA cuDNN**, yang memisahkan
+bagian masukan dan bagian rekuren setiap gerbang. Keras memakainya sebagai bawaan
+(`reset_after=True`, *"cuDNN compatible"*). LSTM di Keras cukup memakai satu bias
+karena pada LSTM semua bias hanya dijumlahkan sehingga selalu bisa digabung.
+
+**Dampak ke jumlah parameter (persamaan 27).** GRU {k['gru']['neuron']} neuron memiliki
+2 × 3 × {k['gru']['neuron']} = {6 * k['gru']['neuron']} bias gerbang (Tabel 12: bias
+berbentuk (2, {3 * k['gru']['neuron']})). Dengan satu bias jumlahnya hanya
+{3 * k['gru']['neuron']}, sehingga total parameter menjadi
+{ribu(k['gru']['param'] - 3 * k['gru']['neuron'])}, bukan {ribu(k['gru']['param'])}.
+""")
+    assert akhir["b_z_in"] == akhir["b_z_rec"] and akhir["b_r_in"] == akhir["b_r_rec"]
+    assert abs(akhir["b_h_in"] - akhir["b_h_rec"]) > 1e-3
+    assert bg["z"][0] == bg["z"][1] and bg["r"][0] == bg["r"][1]
+
+    # 5 ---------------------------------------------------------------------
+    d.teks(f"## {JUDUL_4[5]}")
+    d.teks("""
+1. **Kalimat ringkas tentang fungsi bias** (misalnya setelah persamaan 9 di subbab 1.5.7):
+
+   > Bias berfungsi menggeser fungsi aktivasi sehingga setiap gerbang dan neuron
+   > dapat menentukan kondisi bawaannya sendiri dan tidak dipaksa bernilai tetap
+   > ketika masukannya bernilai nol, misalnya σ(0) = 0,5 atau tanh(0) = 0. Pada LSTM
+   > dan GRU, bias menentukan ambang dan kondisi bawaan setiap gerbang, sedangkan pada
+   > lapisan dense bias menentukan tingkat dasar nilai prediksi.
+
+2. **Penjelasan dua bias GRU** (setelah Gambar 7 atau persamaan 26):
+
+   > Pada Gambar 7, bias tidak digambarkan secara eksplisit karena termuat di dalam
+   > setiap lapisan (kotak σ dan tanh). Pada implementasi Keras dengan pengaturan
+   > reset_after=True, setiap lapisan memisahkan kontribusi masukan xₜW + b⁽ⁱⁿ⁾ dan
+   > kontribusi rekuren hₜ₋₁U + b⁽ʳᵉᶜ⁾, masing-masing dengan biasnya sendiri. Pada
+   > update gate dan reset gate kedua bias hanya dijumlahkan, sedangkan pada kandidat
+   > hidden state bias rekuren b_h⁽ʳᵉᶜ⁾ ikut dikalikan dengan reset gate rₜ sehingga
+   > keduanya tidak dapat digabung menjadi satu. Pemisahan ini mengikuti implementasi
+   > GRU pada pustaka cuDNN yang digunakan Keras (Chollet et al., 2015), sedangkan
+   > Cho et al. (2014) sendiri tidak menuliskan suku bias pada persamaannya.
+""")
+    penutup(d, 4)
 
 
 # --------------------------------------------------------------------------- #
+def tulis(nomor, dokumen):
+    path = os.path.join(DIR_MANUAL, SERI[nomor - 1][0])
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(dokumen.isi())
+    print(f"[tersimpan] {os.path.relpath(path, AKAR)}")
+
+
 def main():
     k = baca_konteks()
     assert abs(k["lr"] - LR) < 1e-12, "Learning rate simulasi harus sama dengan penelitian"
@@ -1573,38 +2425,43 @@ def main():
             f"{model}: langkah Adam pertama harus ±η"
         assert latih["L"][-1] < 1e-4 < latih["L"][0]
         hasil[model] = {"maju": maju, "mundur": mundur, "num": num, "latih": latih, "selisih": selisih}
+    lstm, gru = hasil["LSTM"], hasil["GRU"]
 
     cek = [
         f"Gradien BPTT manual = gradien numerik untuk 14 parameter LSTM "
-        f"(selisih maksimum {hasil['LSTM']['selisih']:.1e}) dan 14 parameter GRU "
-        f"(selisih maksimum {hasil['GRU']['selisih']:.1e}).",
+        f"(selisih maksimum {lstm['selisih']:.1e}) dan 14 parameter GRU "
+        f"(selisih maksimum {gru['selisih']:.1e}).",
         "Uji geser pada lapisan dense: perubahan loss sebenarnya = gradien × 0.001 "
         "(toleransi 2e-6).",
-        "Langkah Adam pada iterasi k = 1 bernilai ±0.001 untuk semua parameter.",
+        "Langkah Adam pada iterasi k = 1 bernilai ±0.001 untuk semua parameter, dan "
+        "langkah Adam tidak berubah bila gradien dikali 100 (Bagian 2).",
         "Loss turun setelah satu update dan berakhir di bawah 0.0001 setelah "
         f"{ITERASI} iterasi, untuk LSTM maupun GRU.",
         "Bias z dan r GRU tetap kembar (bias masukan = bias rekuren), bias kandidat "
-        "berbeda, baik pada simulasi maupun model terlatih.",
+        "berbeda, baik pada simulasi maupun model terlatih (Bagian 4).",
         "Rentang harga × √(loss validasi) = RMSE validasi pada tabel tuning "
-        "(toleransi 0.1%) untuk LSTM dan GRU.",
+        "(toleransi 0.1%) untuk LSTM dan GRU (Bagian 2).",
+        "Jumlah parameter lapisan rekuren dari rumus (persamaan 22 dan 27) sama dengan "
+        "tabel tuning (Bagian 1).",
     ]
 
-    d = Dokumen()
-    bagian_pembuka(d, k)
-    bagian_0(d, k)
-    bagian_1(d, k)
-    bagian_2(d, k)
-    h = hasil["LSTM"]
-    bagian_3(d, k, LSTM_AWAL, h["maju"], h["mundur"], h["num"], h["latih"])
-    h = hasil["GRU"]
-    bagian_4(d, k, GRU_AWAL, h["maju"], h["mundur"], h["num"], h["latih"])
-    bagian_5(d, k, hasil["LSTM"], hasil["GRU"])
-    bagian_6(d, k, hasil["LSTM"], hasil["GRU"])
-    bagian_7(d, k, hasil["LSTM"], hasil["GRU"], cek)
+    d1 = Dokumen()
+    seri_1_alur_sel(d1, k, lstm, gru)
+    d2 = Dokumen()
+    seri_2_loss_adam(d2, k, lstm)
+    d3 = Dokumen()
+    bagian_pembuka(d3, k)
+    bagian_1(d3, k)
+    bagian_2(d3, k)
+    bagian_3(d3, k, LSTM_AWAL, lstm["maju"], lstm["mundur"], lstm["num"], lstm["latih"])
+    bagian_4(d3, k, GRU_AWAL, gru["maju"], gru["mundur"], gru["num"], gru["latih"])
+    bagian_5(d3, k, lstm, gru)
+    bagian_6(d3, k, lstm, gru, cek)
+    d4 = Dokumen()
+    seri_4_bias(d4, k, lstm, gru)
 
-    with open(BERKAS_KELUARAN, "w", encoding="utf-8") as f:
-        f.write(d.isi())
-    print(f"[tersimpan] {os.path.relpath(BERKAS_KELUARAN, AKAR)}")
+    for nomor, dokumen in enumerate((d1, d2, d3, d4), 1):
+        tulis(nomor, dokumen)
     for c in cek:
         print(f"  OK {c}")
 

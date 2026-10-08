@@ -79,7 +79,7 @@ prediction-lstm-gru-btc/
 │   └── perhitungan_manual/             # perhitungan manual per tahap (.md)
 ├── tools/
 │   ├── bangun_notebook.py              # penyusun notebook (opsional)
-│   ├── simulasi_pelatihan_manual.py    # simulasi manual forward, loss, BPTT, dan Adam
+│   ├── simulasi_pelatihan_manual.py    # seri perhitungan manual pelatihan (sel, loss, Adam, BPTT, bias)
 │   └── uji_cepat.py                    # uji cepat pipeline dengan grid kecil
 ├── requirements.txt
 └── README.md
@@ -194,13 +194,19 @@ dengan angka asli, lalu (b) dibandingkan dengan hasil *library* dan dicek dengan
 `assert` pada toleransi $10^{-5}$. Versi teksnya tersimpan di
 `outputs/perhitungan_manual/tahap_X.md` dan siap disalin ke Bab III.
 
-**Simulasi pelatihan bobot.** Berkas
-`outputs/perhitungan_manual/tahap_7_8_simulasi_pelatihan_lstm_gru.md` melengkapi
-tahap 7 dan 8 dengan menunjukkan *bagaimana* bobot dan bias diperoleh. Satu
-siklus pelatihan (*forward pass* → *loss* MSE → *backpropagation through time* →
-Adam) dihitung langkah demi langkah pada model mini 1 neuron untuk LSTM dan GRU,
-termasuk peran bias dan cara menghitungnya. Berkas ini dibuat oleh skrip terpisah
-yang hanya memakai pustaka standar Python (tanpa TensorFlow):
+**Seri perhitungan manual pelatihan.** Empat berkas berikut melengkapi tahap 7
+dan 8 dengan menjelaskan *bagaimana* bobot dan bias diperoleh. Keempatnya memakai
+angka simulasi model mini (1 neuron) yang sama sehingga dapat dibaca berurutan:
+
+| Bagian | Berkas | Isi |
+|---|---|---|
+| 1 | `tahap_7_8_1_alur_sel_lstm_gru.md` | alur Gambar 1-7 (subbab 1.5.8-1.5.9) langkah demi langkah dengan contoh angka |
+| 2 | `tahap_7_8_2_fungsi_loss_dan_adam.md` | fungsi loss MSE dan Adam (subbab 1.5.11): kapan dipakai, kurva loss, contoh angka |
+| 3 | `tahap_7_8_3_simulasi_pelatihan_lstm_gru.md` | satu siklus pelatihan lengkap: *forward pass*, loss, BPTT, gradien, dan Adam |
+| 4 | `tahap_7_8_4_bias_lstm_gru.md` | peran bias, cara menghitungnya, dan asal dua bias pada GRU |
+
+Seri ini dibuat oleh skrip terpisah yang hanya memakai pustaka standar Python
+(tanpa TensorFlow) dan membaca angka konteks dari keluaran notebook:
 
 ```bash
 python tools/simulasi_pelatihan_manual.py
