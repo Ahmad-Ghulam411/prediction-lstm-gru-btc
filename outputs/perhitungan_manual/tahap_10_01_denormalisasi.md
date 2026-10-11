@@ -1,4 +1,4 @@
-# Perhitungan Manual - Tahap 10: Denormalisasi Prediksi ke Skala USD
+# Perhitungan Manual - Tahap 10.1: Denormalisasi Prediksi ke Skala USD
 
 ## Rumus
 
@@ -50,3 +50,13 @@ Rumus:  x = x' * (x_max - x_min) + x_min
 Denormalisasi manual menghasilkan angka yang identik dengan
 `penskala.inverse_transform()` sampai toleransi $10^{-5}$, sehingga seluruh
 prediksi pada Tahap 11 dapat dinyatakan dalam USD dengan yakin.
+
+<!-- navigasi-perhitungan-manual -->
+
+---
+
+← Sebelumnya: [Tahap 9.2: Perbandingan Struktur LSTM dan GRU](tahap_09_02_perbandingan_struktur_lstm_gru.md)
+
+[Daftar isi perhitungan manual](README.md)
+
+→ Berikutnya: [Tahap 11.1: Metrik Evaluasi (RMSE, MAE, MAPE, Akurasi Arah)](tahap_11_01_metrik_evaluasi.md)

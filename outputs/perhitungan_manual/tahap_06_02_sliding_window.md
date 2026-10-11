@@ -1,4 +1,4 @@
-# Perhitungan Manual - Tahap 6: Pembentukan Sliding Window
+# Perhitungan Manual - Tahap 6.2: Pembentukan Sliding Window
 
 ## Rumus
 
@@ -52,3 +52,13 @@ ternormalisasi pada 7 baris pertama dataset:
 Jendela pertama berisi data 2023-07-01 s.d. 2023-07-07
 (7 hari x 10 variabel) dengan target harga penutupan 2023-07-08. Susunan
 jendela terbukti konsisten dengan dataset ternormalisasi.
+
+<!-- navigasi-perhitungan-manual -->
+
+---
+
+← Sebelumnya: [Tahap 5.4: Normalisasi Min-Max Close Price](tahap_05_04_normalisasi_min_max_close_price.md)
+
+[Daftar isi perhitungan manual](README.md)
+
+→ Berikutnya: [Tahap 7.1: Alur Sel LSTM (Gambar 1-6) dengan Model Mini](tahap_07_01_alur_sel_lstm.md)

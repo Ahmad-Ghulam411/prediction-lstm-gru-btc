@@ -1,4 +1,4 @@
-# Perhitungan Manual - Tahap 7: Forward Pass LSTM (Jendela Pertama Data Uji)
+# Perhitungan Manual - Tahap 7.11: Forward Pass LSTM (Jendela Pertama Data Uji)
 
 ## Rumus yang diverifikasi
 
@@ -212,3 +212,13 @@ Prediksi hasil hitung tangan dengan NumPy sebesar
 sedangkan `model.predict()` Keras menghasilkan `0.6423063278`. Selisih
 keduanya hanya 2.94e-08, jauh di bawah toleransi $10^{-5}$, sehingga rumus
 LSTM yang ditulis pada Bab III terbukti identik dengan implementasi Keras.
+
+<!-- navigasi-perhitungan-manual -->
+
+---
+
+← Sebelumnya: [Tahap 7.10: Membaca Kurva Loss Model LSTM](tahap_07_10_kurva_loss_lstm.md)
+
+[Daftar isi perhitungan manual](README.md)
+
+→ Berikutnya: [Tahap 7.12: Bias pada LSTM: Peran dan Cara Menghitungnya](tahap_07_12_bias_lstm.md)
