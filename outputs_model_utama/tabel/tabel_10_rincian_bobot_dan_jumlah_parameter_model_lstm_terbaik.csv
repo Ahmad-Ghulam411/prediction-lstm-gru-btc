@@ -1,0 +1,7 @@
+Bobot,Peran,Bentuk,Jumlah Elemen
+kernel (W),masukan x_t -> 4 gerbang,"(10, 160)",1600
+recurrent_kernel (U),h_(t-1) -> 4 gerbang,"(40, 160)",6400
+bias (b),bias 4 gerbang,"(160,)",160
+Dense kernel (W_y),h_T -> keluaran,"(40, 1)",40
+Dense bias (b_y),bias keluaran,"(1,)",1
+TOTAL,—,—,8201

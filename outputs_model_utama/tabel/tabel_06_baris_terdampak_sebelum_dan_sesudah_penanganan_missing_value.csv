@@ -1,0 +1,10 @@
+Tanggal,Kolom Kosong
+2023-07-14,cost_per_transaction_percent
+2023-11-14,cost_per_transaction_percent
+2024-06-30,cost_per_transaction_percent
+2024-11-18,cost_per_transaction_percent
+2025-06-24,cost_per_transaction_percent
+2025-11-13,"difficulty, hash_rate, median_confirmation_time, avg_block_size, n_unique_addresses, n_transactions_per_block, n_transactions"
+2025-11-14,"difficulty, hash_rate, median_confirmation_time, avg_block_size, n_unique_addresses, n_transactions_per_block, n_transactions"
+2025-11-15,"difficulty, hash_rate, median_confirmation_time, avg_block_size, n_unique_addresses, n_transactions_per_block, n_transactions"
+2026-04-16,n_unique_addresses

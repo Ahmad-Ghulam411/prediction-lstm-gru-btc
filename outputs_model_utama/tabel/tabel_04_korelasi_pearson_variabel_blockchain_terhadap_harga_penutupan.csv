@@ -1,0 +1,10 @@
+Kode,Variabel,r terhadap Close Price,Interpretasi
+X3,Difficulty,0.7827443215788437,kuat dan positif (searah)
+X4,Hash Rate,0.7629299574187617,kuat dan positif (searah)
+X2,Miners Revenue (USD),0.5385374519352634,sedang dan positif (searah)
+X9,Confirmed Transaction,-0.19214900797443016,sangat lemah / hampir tidak ada dan negatif (berlawanan arah)
+X8,Transaction per Block,-0.19624597953362546,sangat lemah / hampir tidak ada dan negatif (berlawanan arah)
+X10,Cost % per Transaction,-0.2887545481316227,lemah dan negatif (berlawanan arah)
+X6,Average Block Size,-0.33122332818568884,lemah dan negatif (berlawanan arah)
+X5,Median Confirmation Time,-0.33379385877650497,lemah dan negatif (berlawanan arah)
+X7,Total Unique Addresses,-0.502487731105491,sedang dan negatif (berlawanan arah)
