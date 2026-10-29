@@ -4,6 +4,8 @@ Uji cepat (smoke test): menjalankan SELURUH kode notebook dengan grid kecil
 supaya galat ketik/logika terdeteksi sebelum eksekusi penuh yang memakan waktu.
 
 Jalankan dari akar proyek:  python tools/uji_cepat.py
+Untuk notebook lain, sebutkan path-nya, misalnya:
+    python tools/uji_cepat.py notebooks/btc_lstm_vs_gru_model_utama.ipynb
 """
 import os
 import sys
@@ -11,7 +13,8 @@ import sys
 import nbformat as nbf
 
 AKAR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-NOTEBOOK = os.path.join(AKAR, "notebooks", "btc_lstm_vs_gru.ipynb")
+NOTEBOOK = (os.path.abspath(sys.argv[1]) if len(sys.argv) > 1
+            else os.path.join(AKAR, "notebooks", "btc_lstm_vs_gru.ipynb"))
 
 PATCH = """
 CONFIG["NEURON_GRID"] = [4, 6]
