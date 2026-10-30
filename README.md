@@ -68,10 +68,12 @@ prediction-lstm-gru-btc/
 ├── data/
 │   └── dataset_bitcoin.csv             # dataset gabungan (tanggal + 10 variabel)
 ├── notebooks/
-│   └── btc_lstm_vs_gru.ipynb           # NOTEBOOK UTAMA, sudah dieksekusi
+│   ├── btc_lstm_vs_gru.ipynb           # NOTEBOOK UTAMA, sudah dieksekusi
+│   └── btc_lstm_vs_gru_model_utama.ipynb # versi perhitungan manual pada model utama (lihat 5.1)
 ├── src/                                # fungsi pendukung
 │   ├── data.py                         # pengambilan data Blockchain.com API
 │   ├── manual_pelatihan.py             # simulasi manual pelatihan LSTM & GRU (model mini)
+│   ├── manual_model_utama.py           # perhitungan manual pelatihan LSTM & GRU (model utama)
 │   ├── metrik.py                       # RMSE, MAE, MAPE, akurasi arah, Diebold-Mariano
 │   └── utils.py                        # header tahap, format angka, penyimpanan tabel/gambar
 ├── outputs/
@@ -79,8 +81,10 @@ prediction-lstm-gru-btc/
 │   ├── gambar/                         # seluruh gambar (.png, 300 dpi)
 │   └── perhitungan_manual/             # perhitungan manual per subbagian (tahap_TT_SS_*.md)
 │                                       # dan daftar isinya (README.md)
+├── outputs_model_utama/                # keluaran notebook versi model utama (susunan sama)
 ├── tools/
 │   ├── bangun_notebook.py              # penyusun notebook (opsional)
+│   ├── bangun_notebook_model_utama.py  # penyusun notebook versi model utama
 │   └── uji_cepat.py                    # uji cepat pipeline dengan grid kecil
 ├── requirements.txt
 └── README.md
@@ -207,6 +211,42 @@ dilatih, notebook menghitung satu siklus pelatihan pada model mini (1 neuron, 1 
 *backpropagation through time*, dan update Adam. LSTM dan GRU dihitung terpisah pada
 tahapnya masing-masing; perbandingan strukturnya ada di Tahap 9.2. Perhitungannya ada di
 `src/manual_pelatihan.py` dan setiap gradien diperiksa dengan turunan numerik.
+
+---
+
+### 5.1 Notebook versi model utama
+
+`notebooks/btc_lstm_vs_gru_model_utama.ipynb` berisi alur penelitian yang sama persis
+(data, normalisasi, *window*, tuning, evaluasi, uji Diebold-Mariano), tetapi perhitungan
+manual pelatihan LSTM dan GRU memakai **model utama penelitian**, bukan model mini. Model
+utama di sini berarti model terbaik hasil tuning, dengan masukan 7 hari × 10 fitur, batch 32,
+dan bobot awal asli Keras (seed 42). Karena jumlah neuron terbaik baru diketahui setelah
+tuning, urutan Tahap 7 dan 8 disusun ulang:
+
+| Subbagian | Isi |
+|---|---|
+| 7.1-7.2 / 8.1-8.2 | Tuning dan pemilihan model terbaik |
+| 7.3-7.5 / 8.3-8.5 | Arsitektur, jumlah parameter, bentuk bobot |
+| 7.6 / 8.6 | Alur sel pada satu jendela data asli (LSTM: termasuk sigmoid dan tanh, persamaan 11-13) |
+| 7.7 / 8.7 | Langkah 1-2: *forward pass* batch pertama (32 sampel) dan loss MSE |
+| 7.8 / 8.8 | Langkah 3: BPTT untuk seluruh parameter |
+| 7.9 / 8.9 | Langkah 4: update Adam |
+| 7.10-7.13 / 8.10-8.13 | Kurva loss, *forward pass* model terlatih, bias, prediksi (nomornya sama dengan notebook utama) |
+
+Rinciannya mengikuti satu neuron dan satu sampel supaya bisa dicek dengan kalkulator,
+sedangkan seluruh parameter dihitung dengan NumPy lalu dicocokkan dengan Keras:
+`model.predict()` untuk *forward pass*, `tf.GradientTape` dan turunan numerik untuk gradien,
+dan bobot `model.fit()` setelah batch ke-1 dan ke-2 untuk update Adam. Perhitungannya ada di
+`src/manual_model_utama.py`. Keluaran notebook ini disimpan di `outputs_model_utama/`
+sehingga keluaran notebook utama di `outputs/` tidak tertimpa.
+
+```bash
+python tools/bangun_notebook_model_utama.py        # menyusun ulang notebook dari bangun_notebook.py
+jupyter nbconvert --to notebook --execute --inplace \
+    --ExecutePreprocessor.timeout=-1 \
+    notebooks/btc_lstm_vs_gru_model_utama.ipynb
+python tools/uji_cepat.py notebooks/btc_lstm_vs_gru_model_utama.ipynb   # uji cepat versi ini
+```
 
 ---
 

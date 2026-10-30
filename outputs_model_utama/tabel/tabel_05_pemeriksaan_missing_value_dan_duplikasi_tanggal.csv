@@ -1,0 +1,12 @@
+Kode,Nama Kolom,Jumlah Kosong,Persentase Kosong (%),Tanggal Hilang,Tanggal Duplikat
+Y / X1,close_price,0,0.0,0,0
+X2,miners_revenue,0,0.0,0,0
+X3,difficulty,3,0.26619343389529726,0,0
+X4,hash_rate,3,0.26619343389529726,0,0
+X5,median_confirmation_time,3,0.26619343389529726,0,0
+X6,avg_block_size,3,0.26619343389529726,0,0
+X7,n_unique_addresses,4,0.354924578527063,0,0
+X8,n_transactions_per_block,3,0.26619343389529726,0,0
+X9,n_transactions,3,0.26619343389529726,0,0
+X10,cost_per_transaction_percent,5,0.44365572315882873,0,0
+—,TOTAL / RINGKASAN,27,0.23957409050576756,0,0

@@ -1,0 +1,11 @@
+Kode,Variabel,Chart,Jumlah Observasi API,Tanggal Awal,Tanggal Akhir,Tanggal Hilang vs Kalender
+Y / X1,Close Price (USD),market-price,1127,2023-07-01,2026-07-31,0
+X2,Miners Revenue (USD),miners-revenue,1127,2023-07-01,2026-07-31,0
+X3,Difficulty,difficulty,1124,2023-07-01,2026-07-31,3
+X4,Hash Rate,hash-rate,1124,2023-07-01,2026-07-31,3
+X5,Median Confirmation Time,median-confirmation-time,1124,2023-07-01,2026-07-31,3
+X6,Average Block Size,avg-block-size,1124,2023-07-01,2026-07-31,3
+X7,Total Unique Addresses,n-unique-addresses,1123,2023-07-01,2026-07-31,4
+X8,Transaction per Block,n-transactions-per-block,1124,2023-07-01,2026-07-31,3
+X9,Confirmed Transaction,n-transactions,1124,2023-07-01,2026-07-31,3
+X10,Cost % per Transaction,cost-per-transaction-percent,1122,2023-07-01,2026-07-31,5

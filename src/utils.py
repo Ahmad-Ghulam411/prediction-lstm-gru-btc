@@ -24,8 +24,28 @@ DIR_TABEL = os.path.join(DIR_OUT, "tabel")
 DIR_GAMBAR = os.path.join(DIR_OUT, "gambar")
 DIR_MANUAL = os.path.join(DIR_OUT, "perhitungan_manual")
 
+NAMA_NOTEBOOK = "notebooks/btc_lstm_vs_gru.ipynb"   # disebut di daftar isi perhitungan manual
+
 for _d in (DIR_DATA, DIR_TABEL, DIR_GAMBAR, DIR_MANUAL):
     os.makedirs(_d, exist_ok=True)
+
+
+def atur_folder_keluaran(nama_folder: str = "outputs",
+                         nama_notebook: str = "notebooks/btc_lstm_vs_gru.ipynb") -> str:
+    """
+    Pindahkan folder keluaran (tabel, gambar, perhitungan manual) ke
+    ``<akar proyek>/<nama_folder>/``. Dipakai notebook versi model utama supaya
+    keluarannya tidak menimpa keluaran notebook utama di ``outputs/``.
+    """
+    global DIR_OUT, DIR_TABEL, DIR_GAMBAR, DIR_MANUAL, NAMA_NOTEBOOK
+    DIR_OUT = os.path.join(DIR_PROYEK, nama_folder)
+    DIR_TABEL = os.path.join(DIR_OUT, "tabel")
+    DIR_GAMBAR = os.path.join(DIR_OUT, "gambar")
+    DIR_MANUAL = os.path.join(DIR_OUT, "perhitungan_manual")
+    NAMA_NOTEBOOK = nama_notebook
+    for d in (DIR_TABEL, DIR_GAMBAR, DIR_MANUAL):
+        os.makedirs(d, exist_ok=True)
+    return DIR_OUT
 
 LEBAR = 70  # lebar garis pemisah pada header tahap
 
@@ -166,8 +186,9 @@ def tampilkan_markdown(isi: str) -> None:
     dijalankan sebagai skrip biasa, teksnya dicetak apa adanya. Tautan relatif
     disesuaikan karena notebook berada di folder ``notebooks/``.
     """
-    teks = (isi.replace("](tahap_", "](../outputs/perhitungan_manual/tahap_")
-               .replace("](../gambar/", "](../outputs/gambar/"))
+    folder = os.path.relpath(DIR_OUT, DIR_PROYEK).replace(os.sep, "/")
+    teks = (isi.replace("](tahap_", f"](../{folder}/perhitungan_manual/tahap_")
+               .replace("](../gambar/", f"](../{folder}/gambar/"))
     try:
         from IPython import get_ipython
         from IPython.display import Markdown, display
@@ -207,7 +228,7 @@ def tulis_indeks_manual() -> str:
     baris = [
         "# Daftar Perhitungan Manual",
         "",
-        "Berkas di folder ini ditulis otomatis oleh notebook `notebooks/btc_lstm_vs_gru.ipynb`.",
+        f"Berkas di folder ini ditulis otomatis oleh notebook `{NAMA_NOTEBOOK}`.",
         "Nama berkas `tahap_TT_SS_nama.md` berarti **Tahap TT, subbagian TT.SS** di notebook,",
         "sehingga urutan berkas sama dengan urutan pengerjaan dari tahap pertama sampai",
         "terakhir. Setiap berkas diakhiri tautan ke berkas sebelumnya dan berikutnya.",
